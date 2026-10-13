@@ -1,0 +1,56 @@
+---
+title: "Spatial thinking and crime mapping in R"
+subtitle: "Half-day hands-on workshop"
+toc: false
+---
+
+**Where things happen matters.** A taster in spatial analysis, using crime in Manchester as the example. All code runs in your browser. Edit it, break it, re-run it.
+
+## You will
+
+- Turn a spreadsheet into a map
+- See how **units, rates and colour classes** change a map's story
+- Do **spatial operations**: buffers, points in polygons
+- Measure **spatial dependence** (Moran's I)
+
+Thread through it all: **representation → decisions → interpretation.**
+
+## How it works
+
+- **Run Code** runs a block. Run blocks **top to bottom**.
+- **Start Over** resets a block.
+- Exercises have `______` blanks, a hint and a solution.
+- First load downloads R into your browser (~1 min).
+
+## Plan
+
+| Time | |
+|---|---|
+| 0:00 | Welcome, browser check |
+| 0:10 | Talk 1: Thinking spatially |
+| 0:25 | [Practical 0](00-r-warmup.qmd) (optional) + [Practical 1](01-spatial-data.qmd): spreadsheet → map |
+| 1:00 | Talk 2: Units of analysis |
+| 1:10 | [Practical 2](02-units-of-analysis.qmd): counts, rates, MAUP |
+| 1:45 | *Break* |
+| 2:00 | Talk 3: Crime and place |
+| 2:10 | [Practical 3](03-spatial-operations.qmd): spatial operations |
+| 2:35 | Talk 4: Spatial dependence |
+| 2:45 | [Practical 4](04-spatial-dependence.qmd): Moran's I |
+| 3:15 | [Where next?](next-steps.qmd) |
+
+## Pick your route
+
+- **New to R and GIS:** run the code, focus on the *Think* questions.
+- **Know R:** skip Practical 0. Try the **Know R?** boxes.
+- **Know GIS:** see the **From GIS?** boxes for QGIS/ArcGIS equivalents.
+
+## Data
+
+Study area: 8 wards from Manchester city centre to Fallowfield. All open data (OGL v3).
+
+- Crime, June 2019: [data.police.uk](https://data.police.uk/)
+- LSOA + ward boundaries: ONS. Contains OS data © Crown copyright.
+- Population, Census 2021: [nomis](https://www.nomisweb.co.uk/)
+- Licensed premises: Manchester City Council
+
+Adapted from the [Crime Mapping module](https://maczokni.github.io/crime_mapping_textbook/) (Solymosi & Medina, University of Manchester).

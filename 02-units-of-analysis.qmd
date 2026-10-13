@@ -1,0 +1,262 @@
+---
+title: "Practical 2: Units of analysis"
+subtitle: "Counts vs rates. Classification. MAUP."
+format: live-html
+engine: knitr
+webr:
+  cell-options:
+    timelimit: 120
+  packages:
+    - sf
+    - dplyr
+    - ggplot2
+    - classInt
+---
+
+{{< include _extensions/r-wasm/live/_knitr.qmd >}}
+
+[⏱ 35 min]{.timing}
+
+## Load
+
+```{webr}
+#| caption: "Run me first"
+library(sf)
+library(dplyr)
+library(ggplot2)
+
+data_url <- "https://raw.githubusercontent.com/maczokni/crime_mapping_workshop/main/data/"
+crimes     <- read.csv(paste0(data_url, "crimes.csv"))
+lsoa       <- read.csv(paste0(data_url, "lsoa.csv")) |> st_as_sf(wkt = "geometry", crs = 27700)
+population <- read.csv(paste0(data_url, "population.csv"))
+head(population)
+```
+
+- `respop` = usual residents. `wkdpop` = workday population (Census 2021).
+
+## Points → areas
+
+- New unit of analysis: **the LSOA**, not the crime.
+- Count by area code, then **join** to the polygons.
+
+```{webr}
+counts <- crimes |> count(lsoa21cd, name = "crimes")
+
+lsoa_crime <- lsoa |>
+  left_join(counts, by = "lsoa21cd") |>
+  left_join(population, by = "lsoa21cd") |>
+  mutate(crimes = coalesce(crimes, 0L))   # no crimes = 0
+
+ggplot(lsoa_crime) +
+  geom_sf(aes(fill = crimes)) +
+  scale_fill_viridis_c() +
+  theme_void()
+```
+
+- The city centre dominates.
+
+## Counts or rates?
+
+- Counts map **where people are**.
+- Rate = crimes ÷ population at risk. But which population?
+
+```{webr}
+#| fig-width: 9
+#| fig-height: 4
+lsoa_crime <- lsoa_crime |>
+  mutate(per_resident = crimes / respop * 1000,
+         per_worker   = crimes / wkdpop * 1000)
+
+# map each measure in quintiles (5 = top 20%) so they share one scale
+three <- bind_rows(
+  lsoa_crime |> mutate(measure = "Count",            value = crimes),
+  lsoa_crime |> mutate(measure = "Per 1,000 residents", value = per_resident),
+  lsoa_crime |> mutate(measure = "Per 1,000 workday pop", value = per_worker)
+) |>
+  group_by(measure) |>
+  mutate(quintile = factor(ntile(value, 5)))
+
+ggplot(three) +
+  geom_sf(aes(fill = quintile)) +
+  facet_wrap(~ measure) +
+  scale_fill_brewer(palette = "RdPu") +
+  theme_void()
+```
+
+::: {.callout-important}
+## Think
+- Which areas change most?
+- Which map would you take to a policing meeting? Why?
+- What's the right denominator for *your* topic?
+:::
+
+## Classification
+
+- Colours need class breaks. Someone chooses them.
+- **Equal interval**: equal-width bands. **Quantile**: equal numbers of areas. **Jenks**: natural gaps.
+
+```{webr}
+#| fig-width: 9
+#| fig-height: 4
+library(classInt)
+
+class_of <- function(x, style) {
+  breaks <- classIntervals(x, n = 5, style = style)$brks
+  as.integer(cut(x, unique(breaks), include.lowest = TRUE))
+}
+
+classes <- bind_rows(
+  lsoa_crime |> mutate(method = "Equal interval", class = class_of(per_resident, "equal")),
+  lsoa_crime |> mutate(method = "Quantile",       class = class_of(per_resident, "quantile")),
+  lsoa_crime |> mutate(method = "Jenks",          class = class_of(per_resident, "jenks"))
+)
+
+ggplot(classes) +
+  geom_sf(aes(fill = class)) +
+  facet_wrap(~ method) +
+  scale_fill_distiller(palette = "RdPu", direction = 1) +
+  theme_void()
+```
+
+- Same data. Calm, or alarming?
+- Choose deliberately. Report your choice.
+
+### Your turn
+
+Try `"sd"`, `"pretty"` or `"fisher"`. Change `n`.
+
+```{webr}
+#| setup: true
+#| exercise: ex_classes
+library(sf); library(dplyr); library(ggplot2); library(classInt)
+data_url <- "https://raw.githubusercontent.com/maczokni/crime_mapping_workshop/main/data/"
+lsoa_crime <- read.csv(paste0(data_url, "lsoa.csv")) |> st_as_sf(wkt = "geometry", crs = 27700) |>
+  left_join(read.csv(paste0(data_url, "crimes.csv")) |> count(lsoa21cd, name = "crimes"), by = "lsoa21cd") |>
+  left_join(read.csv(paste0(data_url, "population.csv")), by = "lsoa21cd") |>
+  mutate(crimes = coalesce(crimes, 0L), per_resident = crimes / respop * 1000)
+```
+
+```{webr}
+#| exercise: ex_classes
+breaks <- classIntervals(lsoa_crime$per_resident, n = 5, style = "______")
+breaks
+
+lsoa_crime |>
+  mutate(class = cut(per_resident, unique(breaks$brks), include.lowest = TRUE)) |>
+  ggplot() +
+  geom_sf(aes(fill = class)) +
+  scale_fill_brewer(palette = "RdPu") +
+  theme_void()
+```
+
+::: {.hint exercise="ex_classes"}
+A style name in quotes, e.g. `"sd"`.
+:::
+
+::: {.solution exercise="ex_classes"}
+```r
+breaks <- classIntervals(lsoa_crime$per_resident, n = 6, style = "fisher")
+```
+:::
+
+## MAUP
+
+- **Scale**: results change with the size of units.
+- **Zoning**: results change with where the boundaries fall.
+- Test it with hexagon grids instead of LSOAs:
+
+```{webr}
+#| fig-width: 9
+#| fig-height: 4
+crimes_bng <- crimes |>
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) |>
+  st_transform(27700)
+study_area <- st_union(lsoa)
+
+hex_grid <- function(size, shift = c(0, 0)) {
+  origin <- st_bbox(study_area)[c("xmin", "ymin")] - size + shift
+  grid <- st_make_grid(study_area, cellsize = size, square = FALSE, offset = origin) |>
+    st_sf() |>
+    st_filter(study_area)
+  grid$crimes <- lengths(st_intersects(grid, crimes_bng))   # points in each hexagon
+  grid$size <- paste(size, "m")
+  grid
+}
+
+hexes <- bind_rows(hex_grid(200), hex_grid(400), hex_grid(800)) |>
+  mutate(size = factor(size, levels = c("200 m", "400 m", "800 m")))
+
+ggplot(hexes) +
+  geom_sf(aes(fill = crimes), colour = NA) +
+  facet_wrap(~ size) +
+  scale_fill_viridis_c(trans = "sqrt") +
+  theme_void()
+```
+
+::: {.callout-important}
+## Think
+- Small cells: detail, but noisy. Big cells: stable, but blurred.
+- No "correct" size. Pick one you can **justify**, then test others.
+:::
+
+### Your turn: zoning
+
+Same size, shifted grid. Watch the hottest cell.
+
+```{webr}
+#| setup: true
+#| exercise: ex_zone
+library(sf); library(dplyr); library(ggplot2)
+data_url <- "https://raw.githubusercontent.com/maczokni/crime_mapping_workshop/main/data/"
+lsoa <- read.csv(paste0(data_url, "lsoa.csv")) |> st_as_sf(wkt = "geometry", crs = 27700)
+crimes_bng <- read.csv(paste0(data_url, "crimes.csv")) |>
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) |> st_transform(27700)
+study_area <- st_union(lsoa)
+hex_grid <- function(size, shift = c(0, 0)) {
+  origin <- st_bbox(study_area)[c("xmin", "ymin")] - size + shift
+  grid <- st_make_grid(study_area, cellsize = size, square = FALSE, offset = origin) |>
+    st_sf() |> st_filter(study_area)
+  grid$crimes <- lengths(st_intersects(grid, crimes_bng))
+  grid
+}
+```
+
+```{webr}
+#| exercise: ex_zone
+shifted <- hex_grid(400, shift = c(______, ______))
+
+max(shifted$crimes)   # crimes in the hottest cell
+
+ggplot(shifted) +
+  geom_sf(aes(fill = crimes)) +
+  scale_fill_viridis_c(trans = "sqrt") +
+  theme_void()
+```
+
+::: {.hint exercise="ex_zone"}
+Try `c(0, 0)`, `c(200, 0)`, `c(100, 175)`.
+:::
+
+::: {.callout-note collapse="true"}
+## From GIS?
+- `left_join()` = *Joins* tab
+- `classIntervals()` = *Mode* in graduated symbology
+- `st_make_grid()` + `lengths(st_intersects())` = *Create Grid* + *Count Points in Polygon*
+- In a function, ten grid sizes take one line.
+:::
+
+::: {.callout-tip collapse="true"}
+## Know R?
+- Loop `hex_grid()` over 100–1,500 m. Plot the variance/mean ratio of counts against size.
+- Small denominators make unstable rates. Look up empirical Bayes smoothing: `spdep::EBlocal()`.
+- Squares vs hexagons: `square = TRUE`.
+:::
+
+## Recap
+
+- Aggregating changes the unit of analysis.
+- The denominator should match the population **at risk**.
+- Classification changes the message.
+- MAUP: test different scales and zones.
+
+Next: [Practical 3](03-spatial-operations.qmd)

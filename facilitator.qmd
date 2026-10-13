@@ -1,0 +1,59 @@
+---
+title: "Facilitator notes"
+---
+
+## Before
+
+- [ ] Send the blurb and the [prep page](prepare.qmd) 2 weeks ahead. Ask people to do the browser check.
+- [ ] Optional poll: R experience? GIS experience? Discipline?
+- [ ] Test on the venue Wi-Fi. Each laptop downloads ~30–60 MB on first load.
+- [ ] Fallback: slides have every key figure. Code runs in RStudio or Posit Cloud.
+
+## Running order (3.5 h)
+
+| Time | Block | Notes |
+|---|---|---|
+| 0:00 | Welcome | Hands up: R? GIS? Open Practicals 0 and 1 now so R loads |
+| 0:10 | Talk 1 | Thinking spatially |
+| 0:25 | P0 + P1 | New to R: P0 first. Others: straight to P1 |
+| 1:00 | Talk 2 | Units of analysis. Open P2 during the talk |
+| 1:10 | P2 | Hex grids take a few seconds |
+| 1:45 | Break | |
+| 2:00 | Talk 3 | Crime and place |
+| 2:10 | P3 | |
+| 2:35 | Talk 4 | Play "spot the real map" with the room |
+| 2:45 | P4 | `spdep` takes ~20 s to load |
+| 3:15 | Wrap-up | Point each group to its section of Where next? |
+
+**Short on time? Cut:** the P2 zoning exercise, then P3 nearest-venue allocation, then P4 LISA (show it on a slide instead).
+
+## Adapting
+
+- **Mostly new to both:** code is a recipe to run, not to write. Pairs. *Think* boxes.
+- **Mostly know R:** skip P0. Push the *Know R?* boxes. Stress CRS, MAUP, non-independence.
+- **Mostly know GIS:** brief concepts. *From GIS?* boxes. Sell reproducibility.
+- **Practitioners:** P3 as a venue-profiling request. P2 as "which map goes to tasking?"
+
+## Talks (~10 min each)
+
+1. **Thinking spatially:** crime concentration, Tobler, points/lines/polygons, CRS, anonymised data
+2. **Units of analysis:** points → areas, counts vs rates, classification, MAUP, ecological fallacy
+3. **Crime and place:** attractors vs generators, spatial operations, buffer choice, proximity ≠ causation
+4. **Spatial dependence:** spot the real map, neighbours, lag, Moran's I, LISA, non-independence
+
+## Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| "object not found" | Run the blocks above it, starting with **Run me first** |
+| Stuck on "Loading webR" | Wait. Reload. Try another browser. Pair up |
+| Data won't load | Check the GitHub repo is public and `data_url` points to it |
+| Wants to keep their code | Copy it into RStudio. Nothing is saved |
+
+## Blurb
+
+> **Title:** An introduction to spatial thinking and analysis using R as a crime mapping tool
+>
+> **Description:** This workshop offers a hands-on introduction to spatial analysis using R. Participants will work through a series of guided examples using editable code to learn about topics such as defining units of analysis, spatial data structures (points, lines, and polygons), and their manipulation and visualisation, and the role of spatial dependence. After the session participants should have a better understanding of the relationship between spatial representation, analytical decisions, and interpretation, and how these can be implemented in R.
+>
+> **Requirements:** No prior knowledge assumed, but to get the most out of the session read the preparatory material provided and come with a laptop or tablet on which you can follow along. If you have R and R Studio installed you will have more autonomy to edit the examples, but you can follow along without this too.

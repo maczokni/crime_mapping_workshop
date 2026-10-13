@@ -1,0 +1,102 @@
+---
+title: "Practical 0: R warm-up"
+subtitle: "10 min. Skip if you use R."
+format: live-html
+engine: knitr
+webr:
+  packages:
+    - dplyr
+---
+
+{{< include _extensions/r-wasm/live/_knitr.qmd >}}
+
+## Run code
+
+```{webr}
+2 + 2
+sqrt(144)
+```
+
+- `sqrt()` is a **function**. Inputs go in brackets.
+
+## Objects
+
+```{webr}
+n_crimes <- 3445
+n_areas <- 67
+n_crimes / n_areas
+```
+
+- `<-` stores a result in an **object**.
+
+## Data frames
+
+- Read data straight from the web:
+
+```{webr}
+data_url <- "https://raw.githubusercontent.com/maczokni/crime_mapping_workshop/main/data/"
+crimes <- read.csv(paste0(data_url, "crimes.csv"))
+
+nrow(crimes)
+head(crimes)
+table(crimes$crime_type)
+```
+
+- Rows = crimes. Columns = variables.
+- `$` picks one column.
+
+## The pipe `|>` ("and then")
+
+```{webr}
+library(dplyr)
+
+crimes |>
+  filter(crime_type == "Robbery") |>
+  count(outcome, sort = TRUE)
+```
+
+- `filter()` keeps rows. `count()` tallies them.
+- `==` compares. A single `=` doesn't.
+
+## Your turn
+
+Count **burglaries** by outcome.
+
+```{webr}
+#| setup: true
+#| exercise: warmup_1
+library(dplyr)
+crimes <- read.csv("https://raw.githubusercontent.com/maczokni/crime_mapping_workshop/main/data/crimes.csv")
+```
+
+```{webr}
+#| exercise: warmup_1
+crimes |>
+  filter(crime_type == "______") |>
+  count(______, sort = TRUE)
+```
+
+::: {.hint exercise="warmup_1"}
+`"Burglary"` (capital B). Count by `outcome`.
+:::
+
+::: {.solution exercise="warmup_1"}
+```r
+crimes |>
+  filter(crime_type == "Burglary") |>
+  count(outcome, sort = TRUE)
+```
+:::
+
+## Errors are normal
+
+```{webr}
+crimes |> filter(crime_type == "burglary") |> nrow()
+Crimes |> nrow()
+```
+
+- Line 1: 0 rows. R is case sensitive.
+- Line 2: error. There's no `Crimes`, only `crimes`.
+- Read the error. Search it online.
+
+Next: [Practical 1](01-spatial-data.qmd)

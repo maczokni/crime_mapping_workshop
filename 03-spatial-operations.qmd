@@ -1,0 +1,203 @@
+---
+title: "Practical 3: Spatial operations"
+subtitle: "Union. Select by location. Buffers. Points in polygon."
+format: live-html
+engine: knitr
+webr:
+  cell-options:
+    timelimit: 120
+  packages:
+    - sf
+    - dplyr
+    - ggplot2
+---
+
+{{< include _extensions/r-wasm/live/_knitr.qmd >}}
+
+[⏱ 25 min]{.timing}
+
+**Question:** do some licensed premises have more violence nearby than others?
+
+- **Crime generators** draw crowds (shops, stations). Crime follows.
+- **Crime attractors** draw offenders (known trouble spots).
+- Brantingham & Brantingham (1995).
+
+## Load
+
+```{webr}
+#| caption: "Run me first"
+library(sf)
+library(dplyr)
+library(ggplot2)
+
+data_url <- "https://raw.githubusercontent.com/maczokni/crime_mapping_workshop/main/data/"
+crimes_bng <- read.csv(paste0(data_url, "crimes.csv")) |>
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) |>
+  st_transform(27700)
+wards <- read.csv(paste0(data_url, "wards.csv")) |>
+  st_as_sf(wkt = "geometry", crs = 27700)
+premises <- read.csv(paste0(data_url, "licensed_premises.csv")) |>
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) |>
+  st_transform(27700)
+```
+
+- Premises: council licensing register, with addresses **geocoded** (address → coordinates).
+
+## 1. Union: build a "city centre"
+
+- Two wards → one polygon.
+
+```{webr}
+city_centre <- wards |>
+  filter(ward_name %in% c("Deansgate", "Piccadilly")) |>
+  st_union()
+
+ggplot() +
+  geom_sf(data = wards, fill = "grey95") +
+  geom_sf(data = city_centre, fill = "#5b2a86", alpha = 0.5) +
+  theme_void()
+```
+
+## 2. Select by location
+
+- Keep only features inside the city centre.
+
+```{webr}
+premises_cc <- st_filter(premises, city_centre)
+violence_cc <- crimes_bng |>
+  filter(crime_type == "Violence and sexual offences") |>
+  st_filter(city_centre)
+
+nrow(premises); nrow(premises_cc); nrow(violence_cc)
+
+ggplot() +
+  geom_sf(data = city_centre, fill = "grey95") +
+  geom_sf(data = violence_cc, colour = "grey40", alpha = 0.5) +
+  geom_sf(data = premises_cc, colour = "red", shape = 17) +
+  theme_void()
+```
+
+## 3. Buffers
+
+- Draw a zone around each venue. Here, 50 m.
+- Metres only work because we're in British National Grid.
+
+```{webr}
+buffers <- st_buffer(premises_cc, dist = 50)
+
+ggplot() +
+  geom_sf(data = city_centre, fill = "grey95") +
+  geom_sf(data = buffers, fill = "red", alpha = 0.2, colour = NA) +
+  theme_void()
+```
+
+::: {.callout-important}
+## Think
+- Why 50 m? Why not 25 m or 400 m?
+- The buffer **operationalises** "near the venue". Justify it, then test it.
+:::
+
+## 4. Points in polygon
+
+- Count violent crimes inside each buffer.
+
+```{webr}
+buffers$violence <- lengths(st_intersects(buffers, violence_cc))
+
+buffers |>
+  st_drop_geometry() |>
+  arrange(desc(violence)) |>
+  select(premises, postcode, violence) |>
+  head(10)
+```
+
+- Identical counts? Several venues were geocoded to **the same point**:
+
+```{webr}
+table(lengths(st_equals(premises_cc)))   # venues sharing a location
+```
+
+## Double counting
+
+- Buffers overlap, so one crime counts against several venues:
+
+```{webr}
+sum(buffers$violence)                 # total counted
+nrow(st_filter(violence_cc, buffers)) # distinct crimes
+```
+
+- Alternative: give each crime to its **nearest** venue only.
+
+```{webr}
+near <- st_filter(violence_cc, buffers)
+near$venue <- premises_cc$premises[st_nearest_feature(near, premises_cc)]
+near |> st_drop_geometry() |> count(venue, sort = TRUE) |> head(10)
+```
+
+- Venues sharing a point: the first in the list "wins" every crime. That's a method artefact, not a finding.
+
+::: {.callout-important}
+## Think
+- Is the top venue a cause (attractor)? Or just somewhere busy (generator)?
+- What data would help? Footfall, opening hours, time of day.
+:::
+
+## Your turn
+
+Does the ranking survive a different buffer? Try 25, 100, 200.
+
+```{webr}
+#| setup: true
+#| exercise: ex_buffer
+library(sf); library(dplyr)
+data_url <- "https://raw.githubusercontent.com/maczokni/crime_mapping_workshop/main/data/"
+city_centre <- read.csv(paste0(data_url, "wards.csv")) |> st_as_sf(wkt = "geometry", crs = 27700) |>
+  filter(ward_name %in% c("Deansgate", "Piccadilly")) |> st_union()
+premises_cc <- read.csv(paste0(data_url, "licensed_premises.csv")) |>
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) |> st_transform(27700) |>
+  st_filter(city_centre)
+violence_cc <- read.csv(paste0(data_url, "crimes.csv")) |>
+  filter(crime_type == "Violence and sexual offences") |>
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) |> st_transform(27700) |>
+  st_filter(city_centre)
+```
+
+```{webr}
+#| exercise: ex_buffer
+my_buffers <- st_buffer(premises_cc, dist = ______)
+my_buffers$violence <- lengths(st_intersects(my_buffers, violence_cc))
+
+my_buffers |>
+  st_drop_geometry() |>
+  arrange(desc(violence)) |>
+  select(premises, violence) |>
+  head(5)
+```
+
+::: {.hint exercise="ex_buffer"}
+A number of metres, e.g. `200`.
+:::
+
+::: {.callout-note collapse="true"}
+## From GIS?
+- `st_union()` = *Dissolve*
+- `st_filter()` = *Select by Location*
+- `st_buffer()` = *Buffer*
+- `lengths(st_intersects())` = *Count Points in Polygon*
+- `st_nearest_feature()` = *Join by Nearest*
+:::
+
+::: {.callout-tip collapse="true"}
+## Know R?
+- Write `top_venue(dist)`. Run it with `sapply(seq(25, 300, 25), top_venue)`. How stable is the top venue?
+- Baseline: violence within 50 m of **random** points, `st_sample(city_centre, nrow(premises_cc))`.
+:::
+
+## Recap
+
+- Spatial operations join by **location**, not by ID.
+- Same CRS needed. Metres for distance.
+- Buffer size and counting rules are choices. Test them.
+- Proximity ≠ causation.
+
+Next: [Practical 4](04-spatial-dependence.qmd)

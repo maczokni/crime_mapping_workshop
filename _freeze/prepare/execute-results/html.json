@@ -1,0 +1,15 @@
+{
+  "hash": "e8ec6d7ca7607fd6b8e36f0d0203d0c8",
+  "result": {
+    "engine": "knitr",
+    "markdown": "---\ntitle: \"Before the session\"\nsubtitle: \"~30 minutes\"\nformat: live-html\nengine: knitr\nwebr:\n  packages:\n    - sf\n    - ggplot2\n---\n\n\n::: {.cell}\n\n:::\n\n\n\n## 1. Browser check (2 min)\n\n- Laptop or tablet. Recent Chrome, Edge, Firefox or Safari.\n- Press **Run Code**. Wait ~1 min the first time.\n- You should see a map.\n\n\n::: {.cell}\n```{webr}\nlibrary(sf)\nlibrary(ggplot2)\ndata_url <- \"https://raw.githubusercontent.com/maczokni/crime_mapping_workshop/main/data/\"\nwards <- read.csv(paste0(data_url, \"wards.csv\")) |> st_as_sf(wkt = \"geometry\", crs = 27700)\nggplot(wards) + geom_sf() + geom_sf_text(aes(label = ward_name), size = 3) + theme_void()\n```\n:::\n\n\nNo map? Try another browser, or tell the organiser.\n\n::: {.callout-note collapse=\"true\"}\n## Optional: use RStudio instead\n- Install [R](https://cran.r-project.org/) and [RStudio](https://posit.co/download/rstudio-desktop/).\n- Run once: `install.packages(c(\"sf\", \"dplyr\", \"ggplot2\", \"classInt\", \"spdep\"))`\n- All workshop code runs unchanged. The data loads from the web.\n:::\n\n## 2. Key ideas (10 min)\n\n**Why space?**\n\n- Crime is concentrated: a few places account for most of it (Weisburd, 2015).\n- Tobler's first law: *near things are more related than distant things.*\n- Not just criminology: health, ecology, economics, history…\n\n**Spatial data = attributes + location**\n\n- **Points**: a crime. **Lines**: a street. **Polygons**: a neighbourhood.\n- In R, `sf` stores these as a table with a `geometry` column.\n\n**Coordinate reference systems (CRS)**\n\n- **WGS 84** (EPSG 4326): longitude/latitude, in degrees. GPS, web maps.\n- **British National Grid** (EPSG 27700): metres. Use it for distances and areas.\n- Layers must share a CRS before you combine them.\n\n**Units of analysis**\n\n- Points are often counted into areas, e.g. **LSOAs** (~1,500 residents each).\n- The **MAUP**: results change with the size and boundaries of areas.\n- Rates depend on the denominator. Residents? Visitors?\n\n**Spatial dependence**\n\n- Neighbouring places tend to be alike.\n- Interesting: clusters, hot spots.\n- A problem: most statistics assume independence.\n\n## 3. Read one (15 min)\n\n- Weisburd (2015) [The law of crime concentration](https://doi.org/10.1111/1745-9125.12070). *Criminology*.\n- Medina & Solymosi (2023) [*Crime Mapping and Spatial Data Analysis using R*](https://maczokni.github.io/crime_mapping/), chapter 1.\n- New to R: [*R for Data Science*](https://r4ds.hadley.nz/), \"Whole game\".\n- Know R: [*Geocomputation with R*](https://r.geocompx.org/), chapter 2.\n",
+    "supporting": [],
+    "filters": [
+      "rmarkdown/pagebreak.lua"
+    ],
+    "includes": {},
+    "engineDependencies": {},
+    "preserve": {},
+    "postProcess": true
+  }
+}

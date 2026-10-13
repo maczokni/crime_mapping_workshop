@@ -1,0 +1,47 @@
+/*-- scss:defaults --*/
+$primary: #5b2a86;
+$link-color: #5b2a86;
+$font-size-root: 17px;
+
+/*-- scss:rules --*/
+.lede {
+  font-size: 1.2rem;
+  color: #444;
+  margin-bottom: 1.5rem;
+}
+
+.timing {
+  display: inline-block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #5b2a86;
+  background: #f1eaf8;
+  border-radius: 4px;
+  padding: 0.1rem 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.pathways {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin: 1rem 0 1.5rem 0;
+}
+
+.pathways > div {
+  border: 1px solid #ddd;
+  border-left: 4px solid #5b2a86;
+  border-radius: 4px;
+  padding: 0.75rem 1rem;
+  background: #fcfbfe;
+}
+
+.pathways h4 {
+  margin-top: 0;
+  font-size: 1.05rem;
+}
+
+table.schedule td:first-child {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}

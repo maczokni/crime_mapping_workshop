@@ -1,0 +1,12 @@
+/.quarto/
+/_site/
+*_files/
+*.knit.md
+.Rhistory
+.RData
+.Rproj.user/
+.DS_Store
+
+**/*.quarto_ipynb
+.positai
+/_to_delete/

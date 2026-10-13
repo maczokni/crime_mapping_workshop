@@ -1,0 +1,10 @@
+/*-- scss:defaults --*/
+$link-color: #5b2a86;
+$presentation-heading-color: #3b1a5a;
+$presentation-font-size-root: 34px;
+
+/*-- scss:rules --*/
+.reveal .slide-background-content { background-color: inherit; }
+.reveal .has-dark-background h1 { color: #ffffff; }
+.reveal blockquote { font-size: 0.85em; border-left: 4px solid #5b2a86; box-shadow: none; background: #f6f1fb; }
+.reveal table { font-size: 0.7em; }

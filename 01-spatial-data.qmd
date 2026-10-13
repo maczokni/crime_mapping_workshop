@@ -1,0 +1,175 @@
+---
+title: "Practical 1: From spreadsheet to map"
+subtitle: "Points, lines, polygons. CRS."
+format: live-html
+engine: knitr
+webr:
+  cell-options:
+    timelimit: 120
+  packages:
+    - sf
+    - dplyr
+    - ggplot2
+---
+
+{{< include _extensions/r-wasm/live/_knitr.qmd >}}
+
+[⏱ 30 min]{.timing}
+
+## Load
+
+```{webr}
+#| caption: "Run me first"
+library(sf)
+library(dplyr)
+library(ggplot2)
+
+data_url <- "https://raw.githubusercontent.com/maczokni/crime_mapping_workshop/main/data/"
+crimes <- read.csv(paste0(data_url, "crimes.csv"))
+head(crimes)
+```
+
+- One row per crime, June 2019, central and south Manchester.
+
+## Where is the "where"?
+
+Three columns hold location:
+
+| Column | Structure |
+|---|---|
+| `longitude`, `latitude` | **point** |
+| `location` ("On or near …") | **line** (street) |
+| `lsoa21cd` (census area) | **polygon** |
+
+```{webr}
+crimes |> count(location, sort = TRUE) |> head(8)
+```
+
+- "Shopping Area", "Nightclub"? These aren't streets.
+- police.uk **snaps crimes to anonymous points** to protect privacy.
+
+::: {.callout-important}
+## Think
+- The data are already a representation. Who decided it, and how?
+:::
+
+## Table → spatial object
+
+```{webr}
+crimes_sf <- st_as_sf(crimes,
+                      coords = c("longitude", "latitude"),
+                      crs = 4326)    # WGS 84: degrees
+crimes_sf
+```
+
+- `geometry` column replaces the coordinates.
+- Header shows geometry type, extent and CRS.
+
+## First map
+
+```{webr}
+ggplot() +
+  geom_sf(data = crimes_sf, alpha = 0.3)
+```
+
+- 3,445 points piled up, with no context.
+- Mostly shows where people are.
+
+## Add polygons
+
+- Census areas (**LSOAs**). The shape is stored as text (WKT) in a `geometry` column:
+
+```{webr}
+lsoa <- read.csv(paste0(data_url, "lsoa.csv")) |>
+  st_as_sf(wkt = "geometry", crs = 27700)   # British National Grid: metres
+
+ggplot() +
+  geom_sf(data = lsoa, fill = "white") +
+  geom_sf(data = crimes_sf, alpha = 0.3, colour = "#5b2a86") +
+  theme_void()
+```
+
+- More usual: `st_read("file.shp")` or `.geojson`. Same result.
+
+## CRS
+
+```{webr}
+st_crs(crimes_sf)$input
+st_crs(lsoa)$input
+st_crs(crimes_sf) == st_crs(lsoa)
+```
+
+- Different CRSs. `ggplot` lines them up for display only.
+- For analysis: **transform to match**.
+
+```{webr}
+crimes_bng <- st_transform(crimes_sf, 27700)
+
+st_coordinates(crimes_sf)[1, ]   # degrees
+st_coordinates(crimes_bng)[1, ]  # metres
+```
+
+::: {.callout-note collapse="true"}
+## From GIS?
+- `st_as_sf(coords =)` = *Add Delimited Text Layer*
+- `st_crs()` = *Layer Properties → CRS*
+- `st_transform()` = *Reproject Layer*
+- Bonus: the script is your record. Re-run with next month's data.
+:::
+
+## Your turn
+
+Map **bicycle thefts** over the LSOAs.
+
+```{webr}
+#| setup: true
+#| exercise: ex_bike
+library(sf); library(dplyr); library(ggplot2)
+data_url <- "https://raw.githubusercontent.com/maczokni/crime_mapping_workshop/main/data/"
+crimes_bng <- read.csv(paste0(data_url, "crimes.csv")) |>
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) |>
+  st_transform(27700)
+lsoa <- read.csv(paste0(data_url, "lsoa.csv")) |> st_as_sf(wkt = "geometry", crs = 27700)
+```
+
+```{webr}
+#| exercise: ex_bike
+bikes <- crimes_bng |>
+  filter(crime_type == "______")
+
+ggplot() +
+  geom_sf(data = lsoa, fill = "white", colour = "grey70") +
+  geom_sf(data = ______, colour = "red") +
+  theme_void()
+```
+
+::: {.hint exercise="ex_bike"}
+`"Bicycle theft"`. Second layer: `bikes`.
+:::
+
+::: {.solution exercise="ex_bike"}
+```r
+bikes <- crimes_bng |> filter(crime_type == "Bicycle theft")
+
+ggplot() +
+  geom_sf(data = lsoa, fill = "white", colour = "grey70") +
+  geom_sf(data = bikes, colour = "red") +
+  theme_void()
+```
+:::
+
+- Where do they cluster? Think: where are the bikes?
+
+::: {.callout-tip collapse="true"}
+## Know R?
+- `facet_wrap(~ crime_type)` for small multiples of 4–5 crime types.
+- Distance from each theft to St Peter's Square: `st_point(c(-2.2433, 53.4781))`, then `st_sfc(crs = 4326)`, `st_transform()` and `st_distance()`.
+:::
+
+## Recap
+
+- Location hides in coordinates, addresses, area codes.
+- `st_as_sf()` makes spatial objects. `geom_sf()` maps them.
+- Know your CRS. Match before combining. Metres for distance.
+
+Next: [Practical 2](02-units-of-analysis.qmd)

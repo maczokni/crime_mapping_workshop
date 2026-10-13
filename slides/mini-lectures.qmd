@@ -1,0 +1,330 @@
+---
+title: "Spatial thinking & crime mapping in R"
+subtitle: "Mini-lectures for the half-day workshop"
+format:
+  revealjs:
+    theme: [default, slides.scss]
+    slide-number: true
+    transition: none
+    chalkboard: false
+    preview-links: auto
+    footer: "Spatial thinking & crime mapping in R"
+    fig-align: center
+execute:
+  echo: false
+  warning: false
+  message: false
+knitr:
+  opts_chunk:
+    dev: "png"
+    dpi: 150
+---
+
+```{r setup}
+library(sf)
+library(dplyr)
+library(ggplot2)
+library(classInt)
+library(spdep)
+
+crimes <- read.csv("../data/crimes.csv")
+crimes_bng <- crimes |>
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) |>
+  st_transform(27700)
+lsoa <- read.csv("../data/lsoa.csv") |> st_as_sf(wkt = "geometry", crs = 27700)
+population <- read.csv("../data/population.csv")
+wards <- read.csv("../data/wards.csv") |> st_as_sf(wkt = "geometry", crs = 27700)
+city_centre <- wards |> filter(ward_name %in% c("Deansgate", "Piccadilly")) |> st_union()
+
+lsoa_crime <- lsoa |>
+  left_join(count(crimes, lsoa21cd, name = "crimes"), by = "lsoa21cd") |>
+  left_join(population, by = "lsoa21cd") |>
+  mutate(crimes = coalesce(crimes, 0L),
+         rate_res = crimes / respop * 1000,
+         rate_wkd = crimes / wkdpop * 1000)
+
+theme_set(theme_void(base_size = 16))
+purple <- "#5b2a86"
+```
+
+# Talk 1: Thinking spatially {background-color="#5b2a86"}
+
+## Crime is concentrated in space
+
+```{r concentration}
+sorted <- sort(lsoa_crime$crimes, decreasing = TRUE)
+k <- which(cumsum(sorted) >= sum(sorted) / 2)[1]
+pct <- round(100 * k / length(sorted))
+```
+
+:::: {.columns}
+::: {.column width="45%"}
+City centre to Fallowfield, June 2019: **`r pct`% of neighbourhoods (LSOAs) had half of all recorded crime**.
+
+This pattern is so consistent across cities that Weisburd (2015) called it the **law of crime concentration**.
+
+> "Everything is related to everything else, but near things are more related than distant things."
+> Tobler (1970)
+:::
+
+::: {.column width="55%"}
+```{r concentration-map, fig.width=6, fig.height=6}
+ggplot(lsoa_crime) +
+  geom_sf(aes(fill = crimes >= sorted[k]), colour = "white", linewidth = 0.1) +
+  scale_fill_manual(values = c("grey85", "#d7301f"),
+                    labels = c("Other LSOAs", paste0("The ", k, " LSOAs with half of all crime")),
+                    name = NULL) +
+  theme(legend.position = "bottom")
+```
+:::
+::::
+
+## Spatial data = attributes + location
+
+:::: {.columns}
+::: {.column width="50%"}
+**Vector** data model:
+
+- **Points**: a crime, a pub
+- **Lines**: a street, a bus route
+- **Polygons**: a neighbourhood, a police beat
+
+**Raster**: a grid of cells, e.g. a density surface or a satellite image
+
+In R, `sf` stores vector data as a **table with a geometry column**.
+:::
+
+::: {.column width="50%"}
+```{r vector-types, fig.width=6, fig.height=6}
+one_ward <- wards |> filter(ward_name == "Fallowfield")
+pts <- st_filter(crimes_bng, one_ward)
+bb <- st_bbox(one_ward)
+line <- st_sfc(st_linestring(rbind(c(bb["xmin"], bb["ymin"] + 600), c(bb["xmax"], bb["ymax"] - 700))), crs = 27700) |>
+  st_intersection(one_ward)
+ggplot() +
+  geom_sf(data = one_ward, fill = "#efe7f6", colour = purple, linewidth = 1) +
+  geom_sf(data = line, colour = "grey30", linewidth = 1.5) +
+  geom_sf(data = pts, colour = "#d7301f", size = 1.5) +
+  labs(caption = "Polygon: Fallowfield ward. Points: its crimes. Line: an (illustrative) road.")
+```
+:::
+::::
+
+## Coordinate reference systems
+
+The same crime, in two coordinate reference systems:
+
+```{r crs-table}
+p <- st_as_sf(crimes[1, ], coords = c("longitude", "latitude"), crs = 4326)
+w <- round(st_coordinates(p), 5)
+b <- round(st_coordinates(st_transform(p, 27700)))
+knitr::kable(data.frame(
+  CRS = c("WGS 84 (EPSG:4326)", "British National Grid (EPSG:27700)"),
+  x = c(paste(w[1], "degrees longitude"), paste(b[1], "metres east")),
+  y = c(paste(w[2], "degrees latitude"), paste(b[2], "metres north"))
+))
+```
+
+- **Geographic** (degrees on a sphere) vs **projected** (metres on a flat plane).
+- Every flat map distorts something. Choose a projection to suit the area and the task.
+- **Rules of thumb:** know each layer's CRS, match CRSs before combining layers, and measure in metres.
+
+## The data are already a representation
+
+- police.uk **snaps each crime to an anonymous map point**, e.g. "On or near Shopping Area".
+- Crime data record only what is **reported and recorded**.
+- Boundaries were drawn by someone, for some purpose (census, policing, elections).
+
+**Representation → analytical decisions → interpretation**
+
+➜ **Practical 0** (if new to R) and **Practical 1**
+
+# Talk 2: Units of analysis and the stories maps tell {background-color="#5b2a86"}
+
+## From incidents to places
+
+- Aggregating points to areas changes the **unit of analysis** from crimes to neighbourhoods.
+- Census areas (OA, LSOA, MSOA) are convenient: stable, with lots of attribute data. But they are not "neighbourhoods" as residents experience them.
+- A map of **counts** mostly maps **where people and opportunities are**.
+
+## Counts or rates? The denominator dilemma
+
+```{r rates, fig.width=12, fig.height=4.8}
+three <- bind_rows(
+  lsoa_crime |> mutate(measure = "Count", value = crimes),
+  lsoa_crime |> mutate(measure = "Per 1,000 residents", value = rate_res),
+  lsoa_crime |> mutate(measure = "Per 1,000 workday population", value = rate_wkd)
+) |>
+  group_by(measure) |> mutate(quintile = factor(ntile(value, 5))) |> ungroup()
+ggplot(three) +
+  geom_sf(aes(fill = quintile), colour = NA) +
+  facet_wrap(~ measure) +
+  scale_fill_brewer(palette = "RdPu", name = "Quintile")
+```
+
+Which population is "at risk"? Residents, workers, visitors, dwellings, cars…?
+
+## Same data, three classifications
+
+```{r classes, fig.width=12, fig.height=4.8}
+shade_by <- function(x, style) {
+  as.integer(cut(x, unique(classIntervals(x, n = 5, style = style)$brks), include.lowest = TRUE))
+}
+classified <- bind_rows(
+  lsoa_crime |> mutate(method = "Equal interval", class = shade_by(rate_res, "equal")),
+  lsoa_crime |> mutate(method = "Quantile", class = shade_by(rate_res, "quantile")),
+  lsoa_crime |> mutate(method = "Natural breaks (Jenks)", class = shade_by(rate_res, "jenks"))
+)
+ggplot(classified) +
+  geom_sf(aes(fill = class), colour = NA) +
+  facet_wrap(~ method) +
+  scale_fill_distiller(palette = "RdPu", direction = 1, name = "Class\n(1 = lowest)")
+```
+
+Crimes per 1,000 residents. Calm or alarming? It depends on the break points.
+
+## The modifiable areal unit problem
+
+```{r maup, fig.width=12, fig.height=5.5}
+manchester <- st_union(lsoa)
+hex <- function(cellsize) {
+  g <- st_make_grid(manchester, cellsize = cellsize, square = FALSE,
+                    offset = st_bbox(manchester)[c("xmin", "ymin")] - cellsize) |>
+    st_sf() |> st_filter(manchester)
+  g$crimes <- lengths(st_intersects(g, crimes_bng))
+  g$label <- paste0(cellsize, " m hexagons")
+  g
+}
+hexes <- bind_rows(hex(200), hex(400), hex(800)) |>
+  group_by(label) |> mutate(quintile = factor(ntile(crimes, 5))) |> ungroup() |>
+  mutate(label = factor(label, levels = unique(label)))
+ggplot(hexes) +
+  geom_sf(aes(fill = quintile), colour = NA) +
+  facet_wrap(~ label) +
+  scale_fill_brewer(palette = "RdPu", name = "Quintile")
+```
+
+- **Scale effect:** results change with the size of the units.
+- **Zoning effect:** results change with where the boundaries fall, even at the same size.
+- Related: the **ecological fallacy** (area patterns ≠ individual behaviour).
+
+➜ **Practical 2**
+
+# Talk 3: Crime and place, and spatial operations {background-color="#5b2a86"}
+
+## Why do some places have so much crime?
+
+- **Crime generators:** places that attract lots of people for ordinary reasons, e.g. shopping streets, stations, stadiums. Crime follows the crowds.
+- **Crime attractors:** places known for criminal opportunities, which draw motivated offenders.
+- Brantingham & Brantingham (1995). Later work adds crime **radiators** and **absorbers**.
+
+So are violent incidents concentrated around particular licensed premises?
+
+## Spatial operations: joining by location
+
+```{r buffers, fig.width=7, fig.height=5.5}
+prem <- read.csv("../data/licensed_premises.csv") |>
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) |>
+  st_transform(27700) |> st_filter(city_centre)
+viol <- crimes_bng |> filter(crime_type == "Violence and sexual offences") |> st_filter(city_centre)
+buf <- st_buffer(prem, 50)
+buf$violence <- lengths(st_intersects(buf, viol))
+ggplot() +
+  geom_sf(data = city_centre, fill = "grey95", colour = "grey60") +
+  geom_sf(data = arrange(buf, violence), aes(fill = violence), colour = NA, alpha = 0.85) +
+  geom_sf(data = viol, size = 0.4, alpha = 0.4) +
+  scale_fill_distiller(palette = "Reds", direction = 1, name = "Violent crimes\nwithin 50 m")
+```
+
+**Select by location** (`st_filter`) · **buffer** (`st_buffer`) · **points in polygon** (`st_intersects`) · **nearest** (`st_nearest_feature`)
+
+## Choices that change the answer
+
+- **How near is "near"?** 25 m, 50 m, 400 m? Use theory or evidence, then test sensitivity.
+- **Count or allocate?** Overlapping buffers count the same crime against several venues.
+- **Compared with what?** Busy places have more of everything, so use a baseline such as random points or footfall.
+- **Proximity is not causation.**
+
+➜ **Practical 3**
+
+# Talk 4: Spatial dependence {background-color="#5b2a86"}
+
+## Spot the real map
+
+```{r game, fig.width=10, fig.height=6.5}
+burg <- lsoa |>
+  left_join(crimes |> filter(crime_type == "Vehicle crime") |> count(lsoa21cd, name = "vehicle"),
+            by = "lsoa21cd") |>
+  mutate(vehicle = coalesce(vehicle, 0L))
+set.seed(2024)
+real_panel <- sample(1:4, 1)
+game <- bind_rows(lapply(1:4, function(i) {
+  vals <- if (i == real_panel) burg$vehicle else sample(burg$vehicle)
+  burg |> mutate(panel = paste("Map", LETTERS[i]), value = vals)
+}))
+ggplot(game) +
+  geom_sf(aes(fill = value), colour = NA) +
+  facet_wrap(~ panel, nrow = 1) +
+  scale_fill_viridis_c(option = "magma", trans = "sqrt", name = "Vehicle crime\nJune 2019")
+```
+
+One map is real. The others are the same values **shuffled at random**. Which is real?
+
+::: {.notes}
+The real map is in the panel given by `real_panel` (same seed as Practical 4). Ask for a show of hands, then reveal. Point out how hard it is, and that a permutation test is this game played 999 times.
+:::
+
+## Answer: Map `r LETTERS[real_panel]`
+
+- Our eyes find patterns everywhere, so we need a **measure** and a **test**.
+- Step 1: define **neighbours** (e.g. queen contiguity), the *spatial weights*.
+- Step 2: the **spatial lag**, the average of the neighbours' values.
+- Step 3: **Moran's I**, the correlation between a value and its spatial lag.
+- Step 4: **permutation test**: compare with many random shuffles, as in the game.
+
+## Moran's I for vehicle crime
+
+```{r moran, fig.width=11, fig.height=4.8}
+nb <- poly2nb(burg)
+lw <- nb2listw(nb, style = "W")
+burg <- burg |> mutate(z = as.numeric(scale(vehicle)), z_lag = lag.listw(lw, z))
+set.seed(1)
+mt <- moran.mc(burg$vehicle, lw, nsim = 999)
+p1 <- ggplot(burg, aes(z, z_lag)) +
+  geom_hline(yintercept = 0, colour = "grey60") + geom_vline(xintercept = 0, colour = "grey60") +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", formula = y ~ x, se = FALSE, colour = "#d7301f") +
+  labs(x = "Vehicle crime (standardised)", y = "Spatial lag") + theme_minimal(base_size = 14)
+p2 <- ggplot(data.frame(I = mt$res[1:999]), aes(I)) +
+  geom_histogram(bins = 40, fill = "grey70") +
+  geom_vline(xintercept = mt$statistic, colour = "#d7301f", linewidth = 1) +
+  labs(x = "Moran's I under random shuffling (red: observed)", y = NULL) + theme_minimal(base_size = 14)
+patchwork::wrap_plots(p1, p2)
+```
+
+Observed Moran's I = **`r round(mt$statistic, 2)`**, pseudo p = `r format.pval(mt$p.value, digits = 2)` (999 permutations).
+
+## Where are the clusters? Local Moran's I
+
+```{r lisa, fig.width=6, fig.height=5.5}
+set.seed(1)
+lisa <- localmoran_perm(burg$vehicle, lw, nsim = 499, alternative = "two.sided")
+burg$p_adj <- p.adjust(lisa[, 5], "fdr")
+burg$cluster <- ifelse(burg$p_adj < 0.05, as.character(attr(lisa, "quadr")$mean), "Not significant")
+ggplot(burg) +
+  geom_sf(aes(fill = cluster), colour = "white", linewidth = 0.1) +
+  scale_fill_manual(values = c("High-High" = "#d7191c", "Low-Low" = "#2c7bb6",
+                               "High-Low" = "#fdae61", "Low-High" = "#abd9e9",
+                               "Not significant" = "grey92"), name = NULL)
+```
+
+67 local tests means **adjusting for multiple comparisons** (here, FDR).
+
+## Why it matters beyond maps
+
+- Standard statistics assume **independent observations**. Neighbouring areas are not independent.
+- Ignoring this means standard errors that are too small and false "significant" findings.
+- Check model **residuals** for spatial autocorrelation, and use **spatial regression** (lag/error models) where needed.
+- It's also substantive: diffusion, spillovers, shared context.
+
+➜ **Practical 4**, then **Where next?**

@@ -1,0 +1,49 @@
+---
+title: "Where next?"
+---
+
+All free unless marked.
+
+## New to R and GIS {#new-to-both}
+
+- [*R for Data Science*](https://r4ds.hadley.nz/): start with "Whole game"
+- Full [Crime Mapping in R workbook](https://maczokni.github.io/crime_mapping_textbook/): nine labs, from install to spatial regression
+- [*Crime Mapping and Spatial Data Analysis using R*](https://maczokni.github.io/crime_mapping/) (Medina & Solymosi, 2023)
+- [UK Data Service training](https://ukdataservice.ac.uk/learning-hub/): free webinars, including crime mapping in R
+
+## Know R {#know-r}
+
+- [*Geocomputation with R*](https://r.geocompx.org/): `sf`, `terra`, spatial operations
+- [*Spatial Data Science*](https://r-spatial.org/book/) (Pebesma & Bivand): theory, by the `sf`/`spdep` authors
+- [*Spatial Statistics for Data Science*](https://www.paulamoraga.com/book-spatial/) (Moraga)
+- Packages: `tmap` (thematic maps), `leaflet` (web maps), `spatstat` (point patterns, KDE), `spatialreg` (spatial regression), `sfdep`
+
+## Know GIS {#know-gis}
+
+- [`sf` cheat sheet](https://github.com/rstudio/cheatsheets/blob/main/sf.pdf): GIS operations → R functions
+- [Data Carpentry: geospatial R](https://datacarpentry.github.io/r-raster-vector-geospatial/)
+- QGIS can run R scripts (Processing R Provider plugin)
+- What R adds: **reproducibility**. Every choice is written down.
+
+## Practitioners {#practitioners}
+
+- Chainey & Ratcliffe (2005) *GIS and Crime Mapping*. Wiley. (Not free.)
+- Module chapters: [spatial operations](https://maczokni.github.io/crime_mapping_textbook/performing-spatial-operations-in-r.html), [hot spots / KDE](https://maczokni.github.io/crime_mapping_textbook/studying-spatial-point-patterns.html)
+- When presenting a map, report the **unit, denominator, classification and time window**
+
+## Open data
+
+- Crime: [data.police.uk](https://data.police.uk/)
+- Census: [nomis](https://www.nomisweb.co.uk/sources/census_2021)
+- Boundaries: [ONS Open Geography Portal](https://geoportal.statistics.gov.uk/)
+- Streets and amenities: [OpenStreetMap](https://www.openstreetmap.org/) (R package `osmdata`)
+
+## Readings from today
+
+- Anselin (1995) [LISA](https://doi.org/10.1111/j.1538-4632.1995.tb00338.x). *Geographical Analysis*
+- Brantingham & Brantingham (1995) [Criminality of place](https://doi.org/10.1007/BF02242925). *Eur J Crim Policy Res*
+- Gerell (2017) [Smallest is better?](https://doi.org/10.1007/s10940-016-9297-6) *J Quant Criminol*
+- Openshaw (1984) *The Modifiable Areal Unit Problem*. CATMOG 38
+- Rengert & Lockwood (2009) [Geographical units of analysis](https://doi.org/10.1007/978-0-387-09688-9_5). In *Putting Crime in its Place*
+- Tompson et al. (2015) [UK open crime data: accuracy](https://doi.org/10.1080/15230406.2014.972456). *Cartogr Geogr Inf Sci*
+- Weisburd (2015) [The law of crime concentration](https://doi.org/10.1111/1745-9125.12070). *Criminology*

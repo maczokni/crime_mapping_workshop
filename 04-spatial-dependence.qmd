@@ -1,0 +1,212 @@
+---
+title: "Practical 4: Spatial dependence"
+subtitle: "Neighbours. Spatial lag. Moran's I. Local clusters."
+format: live-html
+engine: knitr
+webr:
+  cell-options:
+    timelimit: 120
+  packages:
+    - sf
+    - dplyr
+    - ggplot2
+    - spdep
+---
+
+{{< include _extensions/r-wasm/live/_knitr.qmd >}}
+
+[⏱ 30 min]{.timing}
+
+- Tobler: *near things are more related than distant things.*
+- True for vehicle crime here? Let's measure it.
+
+## Load
+
+```{webr}
+#| caption: "Run me first (spdep takes a moment)"
+library(sf)
+library(dplyr)
+library(ggplot2)
+library(spdep)
+
+data_url <- "https://raw.githubusercontent.com/maczokni/crime_mapping_workshop/main/data/"
+lsoa <- read.csv(paste0(data_url, "lsoa.csv")) |> st_as_sf(wkt = "geometry", crs = 27700)
+
+vehicle <- read.csv(paste0(data_url, "crimes.csv")) |>
+  filter(crime_type == "Vehicle crime") |>
+  count(lsoa21cd, name = "vehicle")
+
+d <- lsoa |>
+  left_join(vehicle, by = "lsoa21cd") |>
+  mutate(vehicle = coalesce(vehicle, 0L))
+```
+
+## Spot the real map
+
+- One map is real. Three are the same values **shuffled at random**.
+
+```{webr}
+#| fig-height: 6
+set.seed(2024)
+real <- sample(1:4, 1)
+
+game <- bind_rows(lapply(1:4, function(i) {
+  values <- if (i == real) d$vehicle else sample(d$vehicle)
+  d |> mutate(map = paste("Map", LETTERS[i]), value = values)
+}))
+
+ggplot(game) +
+  geom_sf(aes(fill = value)) +
+  facet_wrap(~ map) +
+  scale_fill_viridis_c(option = "magma") +
+  theme_void()
+```
+
+Guess first, then check:
+
+```{webr}
+LETTERS[real]
+```
+
+- Hard? Eyes see patterns in noise. We need a **measure** and a **test**.
+
+## 1. Neighbours
+
+- **Queen contiguity**: areas sharing any boundary point.
+- **Rook**: areas sharing an edge.
+
+```{webr}
+nb <- poly2nb(d, queen = TRUE)
+summary(nb)
+
+links <- nb2lines(nb, coords = st_centroid(st_geometry(d)), as_sf = TRUE)
+ggplot() +
+  geom_sf(data = d, fill = "grey95") +
+  geom_sf(data = links, colour = "#5b2a86") +
+  theme_void()
+```
+
+- This network is the **spatial weights matrix**, *W*. Defining it is a modelling choice.
+
+## 2. Spatial lag
+
+- Spatial lag = average value of an area's neighbours.
+
+```{webr}
+w <- nb2listw(nb, style = "W")   # weights sum to 1 for each area
+d$lag <- lag.listw(w, d$vehicle)
+
+d$vehicle[1]          # area 1
+d$vehicle[nb[[1]]]    # its neighbours
+d$lag[1]              # their average
+```
+
+## 3. Moran's I
+
+- Correlation between each value and its spatial lag.
+- \> 0: like clusters with like. 0: random. < 0: checkerboard.
+
+```{webr}
+d <- d |> mutate(z = as.numeric(scale(vehicle)), z_lag = lag.listw(w, z))
+
+ggplot(d, aes(z, z_lag)) +
+  geom_hline(yintercept = 0) + geom_vline(xintercept = 0) +
+  geom_point() +
+  geom_smooth(method = "lm", formula = y ~ x, se = FALSE, colour = "red") +
+  labs(x = "Vehicle crime (standardised)", y = "Neighbours' average") +
+  theme_minimal()
+```
+
+- Slope = Moran's I.
+- Test it with the game, played 999 times: shuffle, recompute, compare.
+
+```{webr}
+set.seed(1)
+moran.mc(d$vehicle, w, nsim = 999)
+```
+
+## Your turn
+
+Is every crime type clustered? Try `"Burglary"`, `"Shoplifting"`, `"Anti-social behaviour"`.
+
+```{webr}
+#| setup: true
+#| exercise: ex_moran
+library(sf); library(dplyr); library(spdep)
+data_url <- "https://raw.githubusercontent.com/maczokni/crime_mapping_workshop/main/data/"
+lsoa <- read.csv(paste0(data_url, "lsoa.csv")) |> st_as_sf(wkt = "geometry", crs = 27700)
+w <- nb2listw(poly2nb(lsoa), style = "W")
+```
+
+```{webr}
+#| exercise: ex_moran
+counts <- read.csv(paste0(data_url, "crimes.csv")) |>
+  filter(crime_type == "______") |>
+  count(lsoa21cd)
+
+x <- lsoa |> left_join(counts, by = "lsoa21cd") |> mutate(n = coalesce(n, 0L))
+moran.mc(x$n, w, nsim = 999)
+```
+
+::: {.hint exercise="ex_moran"}
+Exact spelling, e.g. `"Burglary"`.
+:::
+
+::: {.solution exercise="ex_moran"}
+- Anti-social behaviour: I ≈ 0.28, clustered.
+- Burglary: I ≈ 0.10, p ≈ 0.08. **Not** significant. 67 areas and one month give weak evidence.
+- Shoplifting: I ≈ 0.06. Shops are scattered islands.
+:::
+
+## 4. Where? Local Moran's I (LISA)
+
+- Global I asks *whether* there's clustering. LISA asks *where*.
+- One test per area means 67 tests. **Adjust for multiple comparisons.**
+
+```{webr}
+set.seed(1)
+lisa <- localmoran_perm(d$vehicle, w, nsim = 499, alternative = "two.sided")
+
+d$p <- p.adjust(lisa[, 5], method = "fdr")
+d$cluster <- ifelse(d$p < 0.05, as.character(attr(lisa, "quadr")$mean), "Not significant")
+table(d$cluster)
+
+ggplot(d) +
+  geom_sf(aes(fill = cluster)) +
+  scale_fill_manual(values = c("High-High" = "#d7191c", "Low-Low" = "#2c7bb6",
+                               "High-Low" = "#fdae61", "Low-High" = "#abd9e9",
+                               "Not significant" = "grey92")) +
+  theme_void()
+```
+
+- **High-High**: hot spot. **Low-High**: low, but surrounded by high.
+
+::: {.callout-important}
+## Think: why it matters beyond maps
+- Most statistics assume **independent** observations.
+- Neighbours aren't independent. Standard errors end up too small, and false positives follow.
+- Check model residuals (`lm.morantest()`). Consider spatial regression.
+:::
+
+::: {.callout-note collapse="true"}
+## From GIS?
+- GeoDa: *Univariate Moran's I* / *Local Moran's I*
+- ArcGIS: *Spatial Autocorrelation* / *Cluster and Outlier Analysis*
+- In R: weights, permutations, seed and correction are all in the script. Fully reproducible.
+:::
+
+::: {.callout-tip collapse="true"}
+## Know R?
+- Rook weights: `poly2nb(d, queen = FALSE)`. Or k-nearest: `knn2nb(knearneigh(st_centroid(st_geometry(d)), k = 5))`. Does I change?
+- Rates vs counts: join `population.csv`, test vehicle crime per 1,000 residents.
+- Regression residuals: `lm.morantest(lm(vehicle ~ 1, d), w)`. Then `spatialreg::lagsarlm()`.
+- Tidy interface: [`sfdep`](https://sfdep.josiahparry.com/).
+:::
+
+## Recap
+
+- Spatial dependence: neighbours are alike.
+- Define neighbours (*W*). Compute the lag. Moran's I. Permutation test.
+- LISA shows where. Correct for multiple tests.
+
+Finally: [Where next?](next-steps.qmd)

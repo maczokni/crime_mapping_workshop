@@ -1,0 +1,15 @@
+{
+  "hash": "231db1630a68af5c1c394c6de53bf4c1",
+  "result": {
+    "engine": "knitr",
+    "markdown": "---\ntitle: \"Practical 0: R warm-up\"\nsubtitle: \"10 min. Skip if you use R.\"\nformat: live-html\nengine: knitr\nwebr:\n  packages:\n    - dplyr\n---\n\n\n::: {.cell}\n\n:::\n\n\n\n## Run code\n\n\n::: {.cell}\n```{webr}\n2 + 2\nsqrt(144)\n```\n:::\n\n\n- `sqrt()` is a **function**. Inputs go in brackets.\n\n## Objects\n\n\n::: {.cell}\n```{webr}\nn_crimes <- 3445\nn_areas <- 67\nn_crimes / n_areas\n```\n:::\n\n\n- `<-` stores a result in an **object**.\n\n## Data frames\n\n- Read data straight from the web:\n\n\n::: {.cell}\n```{webr}\ndata_url <- \"https://raw.githubusercontent.com/maczokni/crime_mapping_workshop/main/data/\"\ncrimes <- read.csv(paste0(data_url, \"crimes.csv\"))\n\nnrow(crimes)\nhead(crimes)\ntable(crimes$crime_type)\n```\n:::\n\n\n- Rows = crimes. Columns = variables.\n- `$` picks one column.\n\n## The pipe `|>` (\"and then\")\n\n\n::: {.cell}\n```{webr}\nlibrary(dplyr)\n\ncrimes |>\n  filter(crime_type == \"Robbery\") |>\n  count(outcome, sort = TRUE)\n```\n:::\n\n\n- `filter()` keeps rows. `count()` tallies them.\n- `==` compares. A single `=` doesn't.\n\n## Your turn\n\nCount **burglaries** by outcome.\n\n\n::: {.cell setup='true' exercise='warmup_1'}\n```{webr}\n#| setup: true\n#| exercise: warmup_1\nlibrary(dplyr)\ncrimes <- read.csv(\"https://raw.githubusercontent.com/maczokni/crime_mapping_workshop/main/data/crimes.csv\")\n```\n:::\n\n\n\n::: {.cell exercise='warmup_1'}\n```{webr}\n#| exercise: warmup_1\ncrimes |>\n  filter(crime_type == \"______\") |>\n  count(______, sort = TRUE)\n```\n:::\n\n\n::: {.hint exercise=\"warmup_1\"}\n`\"Burglary\"` (capital B). Count by `outcome`.\n:::\n\n::: {.solution exercise=\"warmup_1\"}\n```r\ncrimes |>\n  filter(crime_type == \"Burglary\") |>\n  count(outcome, sort = TRUE)\n```\n:::\n\n## Errors are normal\n\n\n::: {.cell}\n```{webr}\ncrimes |> filter(crime_type == \"burglary\") |> nrow()\nCrimes |> nrow()\n```\n:::\n\n\n- Line 1: 0 rows. R is case sensitive.\n- Line 2: error. There's no `Crimes`, only `crimes`.\n- Read the error. Search it online.\n\nNext: [Practical 1](01-spatial-data.qmd)\n",
+    "supporting": [],
+    "filters": [
+      "rmarkdown/pagebreak.lua"
+    ],
+    "includes": {},
+    "engineDependencies": {},
+    "preserve": {},
+    "postProcess": true
+  }
+}
