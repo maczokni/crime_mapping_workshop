@@ -175,13 +175,6 @@ ggplot(d) +
 If you ran a regression on these 67 areas, which of its assumptions would this break?
 :::
 
-::: {.callout-note collapse="true"}
-## From GIS?
-- GeoDa: *Univariate Moran's I* / *Local Moran's I*
-- ArcGIS: *Spatial Autocorrelation* / *Cluster and Outlier Analysis*
-- In R: weights, permutations, seed and correction are all in the script. Fully reproducible.
-:::
-
 ::: {.callout-tip collapse="true"}
 ## Know R?
 - Rook weights: `poly2nb(d, queen = FALSE)`. Or k-nearest: `knn2nb(knearneigh(st_centroid(st_geometry(d)), k = 5))`. Does I change?

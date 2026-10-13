@@ -4,7 +4,7 @@ title: "Where next?"
 
 All free unless marked.
 
-## New to R and GIS {#new-to-both}
+## New to R {#new-to-r}
 
 - [*R for Data Science*](https://r4ds.hadley.nz/): start with "Whole game"
 - Full [Crime Mapping in R workbook](https://maczokni.github.io/crime_mapping_textbook/): nine labs, from install to spatial regression
@@ -17,13 +17,6 @@ All free unless marked.
 - [*Spatial Data Science*](https://r-spatial.org/book/) (Pebesma & Bivand): theory, by the `sf`/`spdep` authors
 - [*Spatial Statistics for Data Science*](https://www.paulamoraga.com/book-spatial/) (Moraga)
 - Packages: `tmap` (thematic maps), `leaflet` (web maps), `spatstat` (point patterns, KDE), `spatialreg` (spatial regression), `sfdep`
-
-## Know GIS {#know-gis}
-
-- [`sf` cheat sheet](https://github.com/rstudio/cheatsheets/blob/main/sf.pdf): GIS operations → R functions
-- [Data Carpentry: geospatial R](https://datacarpentry.github.io/r-raster-vector-geospatial/)
-- QGIS can run R scripts (Processing R Provider plugin)
-- What R adds: **reproducibility**. Every choice is written down.
 
 ## Practitioners {#practitioners}
 

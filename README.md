@@ -21,7 +21,7 @@ is separate and was not modified.
 | `02-units-of-analysis.qmd` | Practical 2: aggregation, counts vs rates, classification, MAUP |
 | `03-spatial-operations.qmd` | Practical 3: select by location, buffers, points in polygon |
 | `04-spatial-dependence.qmd` | Practical 4: neighbours, spatial lag, Moran's I, LISA |
-| `next-steps.qmd` | Resources by background (new to both / know R / know GIS / practitioners) |
+| `next-steps.qmd` | Resources by background (new to R / know R / practitioners) |
 | `slides/mini-lectures.qmd` | Reveal.js slides for the four ~10-minute talks (figures built from the workshop data) |
 | `data/` | Small CSV datasets (~600 KB), read from GitHub by URL |
 | `data-raw/` | Scripts that created `data/` from the module's data folder |
@@ -29,9 +29,7 @@ is separate and was not modified.
 
 ## Hosting on GitHub
 
-
 The site will be at [https://maczokni.github.io/crime_mapping_workshop/](https://maczokni.github.io/crime_mapping_workshop/).
-
 
 **Data** is read straight from the repo:
 

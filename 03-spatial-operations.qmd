@@ -170,15 +170,6 @@ my_buffers |>
 A number of metres, e.g. `200`.
 :::
 
-::: {.callout-note collapse="true"}
-## From GIS?
-- `st_union()` = *Dissolve*
-- `st_filter()` = *Select by Location*
-- `st_buffer()` = *Buffer*
-- `lengths(st_intersects())` = *Count Points in Polygon*
-- `st_nearest_feature()` = *Join by Nearest*
-:::
-
 ::: {.callout-tip collapse="true"}
 ## Know R?
 - Write `top_venue(dist)`. Run it with `sapply(seq(25, 300, 25), top_venue)`. How stable is the top venue?

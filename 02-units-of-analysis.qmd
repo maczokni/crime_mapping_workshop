@@ -219,14 +219,6 @@ ggplot(shifted) +
 Try `c(0, 0)`, `c(200, 0)`, `c(100, 175)`.
 :::
 
-::: {.callout-note collapse="true"}
-## From GIS?
-- `left_join()` = *Joins* tab
-- `classIntervals()` = *Mode* in graduated symbology
-- `st_make_grid()` + `lengths(st_intersects())` = *Create Grid* + *Count Points in Polygon*
-- In a function, ten grid sizes take one line.
-:::
-
 ::: {.callout-tip collapse="true"}
 ## Know R?
 - Loop `hex_grid()` over 100–1,500 m. Plot the variance/mean ratio of counts against size.

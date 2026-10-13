@@ -35,9 +35,8 @@ We work through examples in R. All code runs in your browser, so you can edit it
 
 ## Pick your route
 
-- **New to R and GIS:** run the code, focus on the questions.
+- **New to R:** run the code, focus on the questions.
 - **Know R:** skip Practical 0. Try the **Know R?** boxes.
-- **Know GIS:** see the **From GIS?** boxes for QGIS/ArcGIS equivalents.
 
 ## Data
 
