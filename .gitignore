@@ -10,3 +10,4 @@
 **/*.quarto_ipynb
 .positai
 /_to_delete/
+/_old/

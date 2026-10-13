@@ -16,6 +16,10 @@ webr:
 
 [⏱ 30 min]{.timing}
 
+::: {.main-message}
+Spatial data are already a representation. Someone decided how location was recorded, and in what coordinate system.
+:::
+
 ## Load
 
 ```{webr}
@@ -28,8 +32,6 @@ data_url <- "https://raw.githubusercontent.com/maczokni/crime_mapping_workshop/m
 crimes <- read.csv(paste0(data_url, "crimes.csv"))
 head(crimes)
 ```
-
-- One row per crime, June 2019, central and south Manchester.
 
 ## Where is the "where"?
 
@@ -50,7 +52,7 @@ crimes |> count(location, sort = TRUE) |> head(8)
 
 ::: {.callout-important}
 ## Think
-- The data are already a representation. Who decided it, and how?
+What has been gained, and lost, in recording these crimes this way?
 :::
 
 ## Table → spatial object
@@ -62,18 +64,12 @@ crimes_sf <- st_as_sf(crimes,
 crimes_sf
 ```
 
-- `geometry` column replaces the coordinates.
-- Header shows geometry type, extent and CRS.
-
 ## First map
 
 ```{webr}
 ggplot() +
   geom_sf(data = crimes_sf, alpha = 0.3)
 ```
-
-- 3,445 points piled up, with no context.
-- Mostly shows where people are.
 
 ## Add polygons
 
@@ -99,8 +95,7 @@ st_crs(lsoa)$input
 st_crs(crimes_sf) == st_crs(lsoa)
 ```
 
-- Different CRSs. `ggplot` lines them up for display only.
-- For analysis: **transform to match**.
+- Different CRSs. Transform to match before combining layers.
 
 ```{webr}
 crimes_bng <- st_transform(crimes_sf, 27700)
@@ -158,18 +153,10 @@ ggplot() +
 ```
 :::
 
-- Where do they cluster? Think: where are the bikes?
-
 ::: {.callout-tip collapse="true"}
 ## Know R?
 - `facet_wrap(~ crime_type)` for small multiples of 4–5 crime types.
 - Distance from each theft to St Peter's Square: `st_point(c(-2.2433, 53.4781))`, then `st_sfc(crs = 4326)`, `st_transform()` and `st_distance()`.
 :::
-
-## Recap
-
-- Location hides in coordinates, addresses, area codes.
-- `st_as_sf()` makes spatial objects. `geom_sf()` maps them.
-- Know your CRS. Match before combining. Metres for distance.
 
 Next: [Practical 2](02-units-of-analysis.qmd)

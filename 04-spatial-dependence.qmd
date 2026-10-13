@@ -17,8 +17,9 @@ webr:
 
 [⏱ 30 min]{.timing}
 
-- Tobler: *near things are more related than distant things.*
-- True for vehicle crime here? Let's measure it.
+::: {.main-message}
+Near places are alike. So places are not independent observations, and our methods need to account for that.
+:::
 
 ## Load
 
@@ -68,12 +69,9 @@ Guess first, then check:
 LETTERS[real]
 ```
 
-- Hard? Eyes see patterns in noise. We need a **measure** and a **test**.
-
 ## 1. Neighbours
 
-- **Queen contiguity**: areas sharing any boundary point.
-- **Rook**: areas sharing an edge.
+- Queen contiguity: neighbours share any boundary point.
 
 ```{webr}
 nb <- poly2nb(d, queen = TRUE)
@@ -86,11 +84,9 @@ ggplot() +
   theme_void()
 ```
 
-- This network is the **spatial weights matrix**, *W*. Defining it is a modelling choice.
-
 ## 2. Spatial lag
 
-- Spatial lag = average value of an area's neighbours.
+- Spatial lag: the average of each area's neighbours.
 
 ```{webr}
 w <- nb2listw(nb, style = "W")   # weights sum to 1 for each area
@@ -103,9 +99,6 @@ d$lag[1]              # their average
 
 ## 3. Moran's I
 
-- Correlation between each value and its spatial lag.
-- \> 0: like clusters with like. 0: random. < 0: checkerboard.
-
 ```{webr}
 d <- d |> mutate(z = as.numeric(scale(vehicle)), z_lag = lag.listw(w, z))
 
@@ -117,8 +110,7 @@ ggplot(d, aes(z, z_lag)) +
   theme_minimal()
 ```
 
-- Slope = Moran's I.
-- Test it with the game, played 999 times: shuffle, recompute, compare.
+- Slope = Moran's I. Test: 999 random shuffles, as in the game.
 
 ```{webr}
 set.seed(1)
@@ -160,8 +152,7 @@ Exact spelling, e.g. `"Burglary"`.
 
 ## 4. Where? Local Moran's I (LISA)
 
-- Global I asks *whether* there's clustering. LISA asks *where*.
-- One test per area means 67 tests. **Adjust for multiple comparisons.**
+- One test per area (67 tests), adjusted for multiple comparisons.
 
 ```{webr}
 set.seed(1)
@@ -179,13 +170,9 @@ ggplot(d) +
   theme_void()
 ```
 
-- **High-High**: hot spot. **Low-High**: low, but surrounded by high.
-
 ::: {.callout-important}
-## Think: why it matters beyond maps
-- Most statistics assume **independent** observations.
-- Neighbours aren't independent. Standard errors end up too small, and false positives follow.
-- Check model residuals (`lm.morantest()`). Consider spatial regression.
+## Think
+If you ran a regression on these 67 areas, which of its assumptions would this break?
 :::
 
 ::: {.callout-note collapse="true"}
@@ -202,11 +189,5 @@ ggplot(d) +
 - Regression residuals: `lm.morantest(lm(vehicle ~ 1, d), w)`. Then `spatialreg::lagsarlm()`.
 - Tidy interface: [`sfdep`](https://sfdep.josiahparry.com/).
 :::
-
-## Recap
-
-- Spatial dependence: neighbours are alike.
-- Define neighbours (*W*). Compute the lag. Moran's I. Permutation test.
-- LISA shows where. Correct for multiple tests.
 
 Finally: [Where next?](next-steps.qmd)

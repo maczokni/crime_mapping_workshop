@@ -22,7 +22,6 @@ is separate and was not modified.
 | `03-spatial-operations.qmd` | Practical 3: select by location, buffers, points in polygon |
 | `04-spatial-dependence.qmd` | Practical 4: neighbours, spatial lag, Moran's I, LISA |
 | `next-steps.qmd` | Resources by background (new to both / know R / know GIS / practitioners) |
-| `facilitator.qmd` | Instructor guide: running order, talk outlines, adapting to the room, troubleshooting |
 | `slides/mini-lectures.qmd` | Reveal.js slides for the four ~10-minute talks (figures built from the workshop data) |
 | `data/` | Small CSV datasets (~600 KB), read from GitHub by URL |
 | `data-raw/` | Scripts that created `data/` from the module's data folder |

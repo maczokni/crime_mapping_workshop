@@ -1,19 +1,14 @@
 ---
-title: "Spatial thinking and crime mapping in R"
+title: "An introduction to spatial thinking and analysis using R as a crime mapping tool"
 subtitle: "Half-day hands-on workshop"
 toc: false
 ---
 
-**Where things happen matters.** A taster in spatial analysis, using crime in Manchester as the example. All code runs in your browser. Edit it, break it, re-run it.
+This workshop introduces the concepts of spatial data analysis, using crime as our example. The aim is to get acquainted with how we represent place in data, the analytical decisions we make, and how these shape what we can say about crime, policing and criminal justice in the places they occur.
 
-## You will
+Research on crime and place is very good at telling us **what** happens **where**. It is less good at telling us **why** (Bannister et al., 2019). Keep that in mind today. Every map is built on decisions about representation, and those decisions shape interpretation.
 
-- Turn a spreadsheet into a map
-- See how **units, rates and colour classes** change a map's story
-- Do **spatial operations**: buffers, points in polygons
-- Measure **spatial dependence** (Moran's I)
-
-Thread through it all: **representation → decisions → interpretation.**
+We work through examples in R. All code runs in your browser, so you can edit it and see what changes.
 
 ## How it works
 
@@ -40,7 +35,7 @@ Thread through it all: **representation → decisions → interpretation.**
 
 ## Pick your route
 
-- **New to R and GIS:** run the code, focus on the *Think* questions.
+- **New to R and GIS:** run the code, focus on the questions.
 - **Know R:** skip Practical 0. Try the **Know R?** boxes.
 - **Know GIS:** see the **From GIS?** boxes for QGIS/ArcGIS equivalents.
 

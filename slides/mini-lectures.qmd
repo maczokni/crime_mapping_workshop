@@ -1,6 +1,6 @@
 ---
-title: "Spatial thinking & crime mapping in R"
-subtitle: "Mini-lectures for the half-day workshop"
+title: "An introduction to spatial thinking and analysis using R as a crime mapping tool"
+subtitle: "Half-day workshop"
 format:
   revealjs:
     theme: [default, slides.scss]
@@ -48,6 +48,19 @@ purple <- "#5b2a86"
 ```
 
 # Talk 1: Thinking spatially {background-color="#5b2a86"}
+
+## {.mm-slide}
+
+::: {.mm}
+Spatial data are already a representation.
+:::
+
+## What, where … and why?
+
+- Criminology of place: crime is concentrated at **micro-places** (street segments, hot spots).
+- Strong on **what** happens **where**.
+- Weaker on **why** (Bannister, O'Sullivan & Bates, 2019).
+- Today's thread: **representation → analytical decisions → interpretation**.
 
 ## Crime is concentrated in space
 
@@ -135,17 +148,22 @@ knitr::kable(data.frame(
 - Crime data record only what is **reported and recorded**.
 - Boundaries were drawn by someone, for some purpose (census, policing, elections).
 
-**Representation → analytical decisions → interpretation**
-
 ➜ **Practical 0** (if new to R) and **Practical 1**
 
 # Talk 2: Units of analysis and the stories maps tell {background-color="#5b2a86"}
 
+## {.mm-slide}
+
+::: {.mm}
+The unit of analysis is a choice, and the choice changes the answer.
+:::
+
 ## From incidents to places
 
-- Aggregating points to areas changes the **unit of analysis** from crimes to neighbourhoods.
-- Census areas (OA, LSOA, MSOA) are convenient: stable, with lots of attribute data. But they are not "neighbourhoods" as residents experience them.
-- A map of **counts** mostly maps **where people and opportunities are**.
+- Aggregating points to areas changes the **unit of analysis** from crimes to places.
+- "Neighbourhood" is hard to define. We often fall back on **administrative boundaries** (LSOAs, wards).
+- Places **nest**: street segments within neighbourhoods within cities. Each scale can tell a different story.
+- Collect at the finest level. Aggregate to fit the **theory** (Brantingham et al., 2009), not the data to hand.
 
 ## Counts or rates? The denominator dilemma
 
@@ -162,7 +180,7 @@ ggplot(three) +
   scale_fill_brewer(palette = "RdPu", name = "Quintile")
 ```
 
-Which population is "at risk"? Residents, workers, visitors, dwellings, cars…?
+Which population is "at risk"? Residents, workers, visitors, dwellings, cars…? Ambient population (e.g. from mobile or social media data) is one answer.
 
 ## Same data, three classifications
 
@@ -206,11 +224,18 @@ ggplot(hexes) +
 
 - **Scale effect:** results change with the size of the units.
 - **Zoning effect:** results change with where the boundaries fall, even at the same size.
+- The same applies to **time**: weeks, months, years (the modifiable *temporal* unit problem).
 - Related: the **ecological fallacy** (area patterns ≠ individual behaviour).
 
 ➜ **Practical 2**
 
 # Talk 3: Crime and place, and spatial operations {background-color="#5b2a86"}
+
+## {.mm-slide}
+
+::: {.mm}
+Spatial operations tell us what is near what. They cannot tell us why.
+:::
 
 ## Why do some places have so much crime?
 
@@ -243,11 +268,17 @@ ggplot() +
 - **How near is "near"?** 25 m, 50 m, 400 m? Use theory or evidence, then test sensitivity.
 - **Count or allocate?** Overlapping buffers count the same crime against several venues.
 - **Compared with what?** Busy places have more of everything, so use a baseline such as random points or footfall.
-- **Proximity is not causation.**
+- **Proximity is not causation.** Data do not speak for themselves. They need a theoretical lens.
 
 ➜ **Practical 3**
 
 # Talk 4: Spatial dependence {background-color="#5b2a86"}
+
+## {.mm-slide}
+
+::: {.mm}
+Near places are alike. So places are not independent observations.
+:::
 
 ## Spot the real map
 
@@ -269,10 +300,6 @@ ggplot(game) +
 ```
 
 One map is real. The others are the same values **shuffled at random**. Which is real?
-
-::: {.notes}
-The real map is in the panel given by `real_panel` (same seed as Practical 4). Ask for a show of hands, then reveal. Point out how hard it is, and that a permutation test is this game played 999 times.
-:::
 
 ## Answer: Map `r LETTERS[real_panel]`
 
@@ -326,5 +353,6 @@ ggplot(burg) +
 - Ignoring this means standard errors that are too small and false "significant" findings.
 - Check model **residuals** for spatial autocorrelation, and use **spatial regression** (lag/error models) where needed.
 - It's also substantive: diffusion, spillovers, shared context.
+- A significant cluster is a pattern, not an explanation. Beware data "tortured for patterns that have no intrinsic meaning" (Bannister et al., 2019).
 
 ➜ **Practical 4**, then **Where next?**

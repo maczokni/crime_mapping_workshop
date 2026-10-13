@@ -16,11 +16,11 @@ webr:
 
 [⏱ 25 min]{.timing}
 
-**Question:** do some licensed premises have more violence nearby than others?
+::: {.main-message}
+Spatial operations tell us what is near what. They cannot tell us why.
+:::
 
-- **Crime generators** draw crowds (shops, stations). Crime follows.
-- **Crime attractors** draw offenders (known trouble spots).
-- Brantingham & Brantingham (1995).
+**Task:** which licensed premises in the city centre have the most violence nearby?
 
 ## Load
 
@@ -41,7 +41,7 @@ premises <- read.csv(paste0(data_url, "licensed_premises.csv")) |>
   st_transform(27700)
 ```
 
-- Premises: council licensing register, with addresses **geocoded** (address → coordinates).
+- Premises: council licensing register, geocoded (address → coordinates).
 
 ## 1. Union: build a "city centre"
 
@@ -79,8 +79,7 @@ ggplot() +
 
 ## 3. Buffers
 
-- Draw a zone around each venue. Here, 50 m.
-- Metres only work because we're in British National Grid.
+- 50 m around each venue. (Metres, because we're in British National Grid.)
 
 ```{webr}
 buffers <- st_buffer(premises_cc, dist = 50)
@@ -90,12 +89,6 @@ ggplot() +
   geom_sf(data = buffers, fill = "red", alpha = 0.2, colour = NA) +
   theme_void()
 ```
-
-::: {.callout-important}
-## Think
-- Why 50 m? Why not 25 m or 400 m?
-- The buffer **operationalises** "near the venue". Justify it, then test it.
-:::
 
 ## 4. Points in polygon
 
@@ -138,8 +131,7 @@ near |> st_drop_geometry() |> count(venue, sort = TRUE) |> head(10)
 
 ::: {.callout-important}
 ## Think
-- Is the top venue a cause (attractor)? Or just somewhere busy (generator)?
-- What data would help? Footfall, opening hours, time of day.
+The top venue has the most violence nearby. What would you need to know to say *why*?
 :::
 
 ## Your turn
@@ -192,12 +184,5 @@ A number of metres, e.g. `200`.
 - Write `top_venue(dist)`. Run it with `sapply(seq(25, 300, 25), top_venue)`. How stable is the top venue?
 - Baseline: violence within 50 m of **random** points, `st_sample(city_centre, nrow(premises_cc))`.
 :::
-
-## Recap
-
-- Spatial operations join by **location**, not by ID.
-- Same CRS needed. Metres for distance.
-- Buffer size and counting rules are choices. Test them.
-- Proximity ≠ causation.
 
 Next: [Practical 4](04-spatial-dependence.qmd)

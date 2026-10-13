@@ -17,6 +17,10 @@ webr:
 
 [⏱ 35 min]{.timing}
 
+::: {.main-message}
+The unit of analysis is a choice, and the choice changes the answer.
+:::
+
 ## Load
 
 ```{webr}
@@ -36,7 +40,6 @@ head(population)
 
 ## Points → areas
 
-- New unit of analysis: **the LSOA**, not the crime.
 - Count by area code, then **join** to the polygons.
 
 ```{webr}
@@ -53,12 +56,7 @@ ggplot(lsoa_crime) +
   theme_void()
 ```
 
-- The city centre dominates.
-
 ## Counts or rates?
-
-- Counts map **where people are**.
-- Rate = crimes ÷ population at risk. But which population?
 
 ```{webr}
 #| fig-width: 9
@@ -85,15 +83,10 @@ ggplot(three) +
 
 ::: {.callout-important}
 ## Think
-- Which areas change most?
-- Which map would you take to a policing meeting? Why?
-- What's the right denominator for *your* topic?
+Which of these is "the" crime map of this area? What would you need to know to decide?
 :::
 
 ## Classification
-
-- Colours need class breaks. Someone chooses them.
-- **Equal interval**: equal-width bands. **Quantile**: equal numbers of areas. **Jenks**: natural gaps.
 
 ```{webr}
 #| fig-width: 9
@@ -117,9 +110,6 @@ ggplot(classes) +
   scale_fill_distiller(palette = "RdPu", direction = 1) +
   theme_void()
 ```
-
-- Same data. Calm, or alarming?
-- Choose deliberately. Report your choice.
 
 ### Your turn
 
@@ -161,9 +151,7 @@ breaks <- classIntervals(lsoa_crime$per_resident, n = 6, style = "fisher")
 
 ## MAUP
 
-- **Scale**: results change with the size of units.
-- **Zoning**: results change with where the boundaries fall.
-- Test it with hexagon grids instead of LSOAs:
+- Same crimes, counted in hexagons of three sizes:
 
 ```{webr}
 #| fig-width: 9
@@ -192,12 +180,6 @@ ggplot(hexes) +
   scale_fill_viridis_c(trans = "sqrt") +
   theme_void()
 ```
-
-::: {.callout-important}
-## Think
-- Small cells: detail, but noisy. Big cells: stable, but blurred.
-- No "correct" size. Pick one you can **justify**, then test others.
-:::
 
 ### Your turn: zoning
 
@@ -251,12 +233,5 @@ Try `c(0, 0)`, `c(200, 0)`, `c(100, 175)`.
 - Small denominators make unstable rates. Look up empirical Bayes smoothing: `spdep::EBlocal()`.
 - Squares vs hexagons: `square = TRUE`.
 :::
-
-## Recap
-
-- Aggregating changes the unit of analysis.
-- The denominator should match the population **at risk**.
-- Classification changes the message.
-- MAUP: test different scales and zones.
 
 Next: [Practical 3](03-spatial-operations.qmd)

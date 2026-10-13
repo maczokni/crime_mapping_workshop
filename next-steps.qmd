@@ -40,6 +40,8 @@ All free unless marked.
 
 ## Readings from today
 
+- Bannister, O'Sullivan & Bates (2019) [Place and time in the Criminology of Place](https://doi.org/10.1177/1362480617733726). *Theoretical Criminology*
+- Ratcliffe (2009) [Crime mapping: spatial and temporal challenges](https://www.librarysearch.manchester.ac.uk/permalink/44MAN_INST/1rfd42k/cdi_springer_books_10_1007_978_0_387_77650_7_2). In *Handbook of Quantitative Criminology*
 - Anselin (1995) [LISA](https://doi.org/10.1111/j.1538-4632.1995.tb00338.x). *Geographical Analysis*
 - Brantingham & Brantingham (1995) [Criminality of place](https://doi.org/10.1007/BF02242925). *Eur J Crim Policy Res*
 - Gerell (2017) [Smallest is better?](https://doi.org/10.1007/s10940-016-9297-6) *J Quant Criminol*

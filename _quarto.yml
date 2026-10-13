@@ -12,7 +12,6 @@ project:
     - 03-spatial-operations.qmd
     - 04-spatial-dependence.qmd
     - next-steps.qmd
-    - facilitator.qmd
     - slides/mini-lectures.qmd
 
 execute:
@@ -48,12 +47,8 @@ website:
           - 03-spatial-operations.qmd
           - 04-spatial-dependence.qmd
       - next-steps.qmd
-      - text: "---"
-      - section: "For instructors"
-        contents:
-          - facilitator.qmd
-          - href: slides/mini-lectures.qmd
-            text: Mini-lecture slides
+      - href: slides/mini-lectures.qmd
+        text: Slides
   page-footer:
     left: "Workshop materials adapted from the Crime Mapping module (Solymosi & Medina, University of Manchester). Text licensed CC BY-SA 4.0."
     right: "Contains public sector information licensed under the Open Government Licence v3.0."

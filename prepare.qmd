@@ -1,6 +1,5 @@
 ---
 title: "Before the session"
-subtitle: "~30 minutes"
 format: live-html
 engine: knitr
 webr:
@@ -11,7 +10,13 @@ webr:
 
 {{< include _extensions/r-wasm/live/_knitr.qmd >}}
 
-## 1. Browser check (2 min)
+## Preparatory material
+
+This book chapter on [“Crime Mapping: Spatial and Temporal Challenges”](https://www.librarysearch.manchester.ac.uk/permalink/44MAN_INST/1rfd42k/cdi_springer_books_10_1007_978_0_387_77650_7_2) from 2009 by Jerry Ratcliffe in the Handbook of Quantitative Criminology provides a brief but useful introduction to the relevance of crime mapping for criminology research and criminal justice practice.
+
+* Those taking the course as a postgraduate course unit ought to watch also this [16 minute lecture (Links to YouTube)](https://www.youtube.com/watch?v=dheAqmXvoBY) by Luc Anselin on “Geospatial Visualisation and ESDA”.
+
+## Browser check
 
 - Laptop or tablet. Recent Chrome, Edge, Firefox or Safari.
 - Press **Run Code**. Wait ~1 min the first time.
@@ -25,7 +30,7 @@ wards <- read.csv(paste0(data_url, "wards.csv")) |> st_as_sf(wkt = "geometry", c
 ggplot(wards) + geom_sf() + geom_sf_text(aes(label = ward_name), size = 3) + theme_void()
 ```
 
-No map? Try another browser, or tell the organiser.
+No map? Try another browser, or let me know before the session.
 
 ::: {.callout-note collapse="true"}
 ## Optional: use RStudio instead
@@ -33,41 +38,3 @@ No map? Try another browser, or tell the organiser.
 - Run once: `install.packages(c("sf", "dplyr", "ggplot2", "classInt", "spdep"))`
 - All workshop code runs unchanged. The data loads from the web.
 :::
-
-## 2. Key ideas (10 min)
-
-**Why space?**
-
-- Crime is concentrated: a few places account for most of it (Weisburd, 2015).
-- Tobler's first law: *near things are more related than distant things.*
-- Not just criminology: health, ecology, economics, history…
-
-**Spatial data = attributes + location**
-
-- **Points**: a crime. **Lines**: a street. **Polygons**: a neighbourhood.
-- In R, `sf` stores these as a table with a `geometry` column.
-
-**Coordinate reference systems (CRS)**
-
-- **WGS 84** (EPSG 4326): longitude/latitude, in degrees. GPS, web maps.
-- **British National Grid** (EPSG 27700): metres. Use it for distances and areas.
-- Layers must share a CRS before you combine them.
-
-**Units of analysis**
-
-- Points are often counted into areas, e.g. **LSOAs** (~1,500 residents each).
-- The **MAUP**: results change with the size and boundaries of areas.
-- Rates depend on the denominator. Residents? Visitors?
-
-**Spatial dependence**
-
-- Neighbouring places tend to be alike.
-- Interesting: clusters, hot spots.
-- A problem: most statistics assume independence.
-
-## 3. Read one (15 min)
-
-- Weisburd (2015) [The law of crime concentration](https://doi.org/10.1111/1745-9125.12070). *Criminology*.
-- Medina & Solymosi (2023) [*Crime Mapping and Spatial Data Analysis using R*](https://maczokni.github.io/crime_mapping/), chapter 1.
-- New to R: [*R for Data Science*](https://r4ds.hadley.nz/), "Whole game".
-- Know R: [*Geocomputation with R*](https://r.geocompx.org/), chapter 2.
