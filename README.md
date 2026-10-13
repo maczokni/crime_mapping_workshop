@@ -30,9 +30,7 @@ is separate and was not modified.
 
 ## Hosting on GitHub
 
-1. Create a **public** repo called `crime_mapping_workshop` on your GitHub (`maczokni`). Push this folder to it.
-2. Settings → Pages → source: `gh-pages` branch. The included GitHub Action builds and publishes on every push.
-3. The site will be at `https://maczokni.github.io/crime_mapping_workshop/`.
+The site will be at [https://maczokni.github.io/crime_mapping_workshop/](https://maczokni.github.io/crime_mapping_workshop/).
 
 **Data** is read straight from the repo:
 
