@@ -246,19 +246,27 @@ One pattern is the burglaries recorded in July and August 2026. The others are *
 ## Kernel density: bandwidth is a decision
 
 ```{r kde, fig.width=12, fig.height=4.5}
-xy <- as.data.frame(st_coordinates(burglary))
+set.seed(2026)
+burglary_jit <- st_jitter(burglary, amount = 20)   # move each point up to 20 m off its snap point
+xy <- as.data.frame(st_coordinates(burglary_jit))
+bb <- st_bbox(study_area)
 kde_panel <- function(h, label) {
-  ggplot(xy, aes(X, Y)) +
-    stat_density_2d(geom = "raster", aes(fill = after_stat(density)), contour = FALSE, h = h, n = 150) +
-    geom_sf(data = study_area, fill = NA, colour = "grey30", inherit.aes = FALSE) +
-    scale_fill_viridis_c(option = "magma", guide = "none") +
+  k <- MASS::kde2d(xy$X, xy$Y, h = c(h, h), n = 150, lims = bb[c("xmin", "xmax", "ymin", "ymax")])
+  cells <- expand.grid(X = k$x, Y = k$y)
+  cells$density <- as.vector(k$z)
+  inside <- lengths(st_intersects(st_as_sf(cells, coords = c("X", "Y"), crs = 27700), study_area)) > 0
+  cells <- cells[inside & cells$density > 0.05 * max(cells$density), ]   # drop cells outside the area or near zero
+  ggplot() +
+    geom_raster(data = cells, aes(X, Y, fill = density)) +
+    geom_sf(data = study_area, fill = NA, colour = "grey30") +
+    scale_fill_viridis_c(option = "magma", direction = -1, guide = "none") +
     labs(title = label) +
     theme(plot.title = element_text(hjust = 0.5))
 }
 patchwork::wrap_plots(kde_panel(200, "Narrow"), kde_panel(800, "Medium"), kde_panel(3200, "Wide"), nrow = 1)
 ```
 
-Too narrow: every snap point is a hot spot. Too wide: one blob over the city centre. Choose for the question, and **report it**.
+Burglaries jittered up to 20 m off their snap points. Too narrow: every snap point is a hot spot. Too wide: one blob over the city centre. Choose for the question, and **report it**.
 
 ## Before you trust a density map
 
