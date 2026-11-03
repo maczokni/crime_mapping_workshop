@@ -6,6 +6,8 @@ webr:
   packages:
     - sf
     - ggplot2
+  cell-options:
+    timelimit: 120
 ---
 
 {{< include _extensions/r-wasm/live/_knitr.qmd >}}
@@ -25,9 +27,12 @@ This book chapter on [“Crime Mapping: Spatial and Temporal Challenges”](http
 ```{webr}
 library(sf)
 library(ggplot2)
-data_url <- "https://raw.githubusercontent.com/maczokni/crime_mapping_workshop/main/data/"
-wards <- read.csv(paste0(data_url, "wards.csv")) |> st_as_sf(wkt = "geometry", crs = 27700)
-ggplot(wards) + geom_sf() + geom_sf_text(aes(label = ward_name), size = 3) + theme_void()
+ward_url <- paste0("https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/",
+                   "WD_MAY_2026_UK_BGC/FeatureServer/0/query?where=",
+                   URLencode("LAD26NM='Leeds'", reserved = TRUE), "&outFields=WD26NM&outSR=4326&f=geojson")
+download.file(ward_url, "leeds_wards.geojson", quiet = TRUE)
+leeds_wards <- st_read("leeds_wards.geojson", quiet = TRUE)
+ggplot(leeds_wards) + geom_sf() + labs(title = "The 33 wards of Leeds") + theme_void()
 ```
 
 No map? Try another browser, or let me know before the session.
@@ -35,6 +40,6 @@ No map? Try another browser, or let me know before the session.
 ::: {.callout-note collapse="true"}
 ## Optional: use RStudio instead
 - Install [R](https://cran.r-project.org/) and [RStudio](https://posit.co/download/rstudio-desktop/).
-- Run once: `install.packages(c("sf", "dplyr", "ggplot2", "classInt", "spdep"))`
+- Run once: `install.packages(c("sf", "dplyr", "ggplot2", "jsonlite", "classInt", "ggspatial", "RColorBrewer", "spatstat", "spdep"))`
 - All workshop code runs unchanged. The data loads from the web.
 :::

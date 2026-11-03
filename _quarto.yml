@@ -1,16 +1,14 @@
 project:
   type: website
   output-dir: _site
-  resources:
-    - data
   render:
     - index.qmd
     - prepare.qmd
     - 00-r-warmup.qmd
     - 01-spatial-data.qmd
-    - 02-units-of-analysis.qmd
-    - 03-spatial-operations.qmd
-    - 04-spatial-dependence.qmd
+    - 02-making-maps.qmd
+    - 03-point-patterns.qmd
+    - 04-hot-spots.qmd
     - next-steps.qmd
     - slides/mini-lectures.qmd
 
@@ -19,7 +17,7 @@ execute:
 
 website:
   title: "Spatial thinking & crime mapping in R"
-  description: "A half-day, hands-on taster workshop: spatial data, units of analysis, spatial operations and spatial dependence, with code that runs in your browser."
+  description: "A one-day, hands-on workshop: spatial data, making maps, point patterns and hot spots, with Leeds crime data and code that runs in your browser."
   page-navigation: true
   reader-mode: true
   search: true
@@ -39,13 +37,15 @@ website:
       - href: index.qmd
         text: Welcome
       - prepare.qmd
-      - section: "The workshop"
+      - section: "Morning"
         contents:
           - 00-r-warmup.qmd
           - 01-spatial-data.qmd
-          - 02-units-of-analysis.qmd
-          - 03-spatial-operations.qmd
-          - 04-spatial-dependence.qmd
+          - 02-making-maps.qmd
+      - section: "Afternoon"
+        contents:
+          - 03-point-patterns.qmd
+          - 04-hot-spots.qmd
       - next-steps.qmd
       - href: slides/mini-lectures.qmd
         text: Slides

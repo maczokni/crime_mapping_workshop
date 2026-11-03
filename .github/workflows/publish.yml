@@ -41,6 +41,7 @@ jobs:
             any::classInt
             any::spdep
             any::patchwork
+            any::MASS
 
       - name: Render site
         uses: quarto-dev/quarto-actions/render@v2

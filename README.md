@@ -1,45 +1,61 @@
-# Spatial thinking & crime mapping in R: a half-day workshop
+# Spatial thinking & crime mapping in R: a one-day workshop
 
-An interactive online workbook for a half-day taster workshop:
+An interactive online workbook for a one-day workshop:
 **"An introduction to spatial thinking and analysis using R as a crime mapping tool"**.
 
-It is aimed at PhD students and staff from any discipline with little or no R or GIS experience. The
+It is aimed at PhD students and staff from any discipline with little or no R experience. The
 code runs **in the browser** (via [webR](https://docs.r-wasm.org/webr/latest/) and
 [quarto-live](https://r-wasm.github.io/quarto-live/)), so participants don't need to install anything.
-It is a condensed version of the University of Manchester's
-[Crime Mapping module](https://maczokni.github.io/crime_mapping_textbook/). The module's own repository
+It is adapted from the University of Manchester's
+[Crime Mapping module](https://maczokni.github.io/crime_mapping_textbook/), using open data for Leeds. The module's own repository
 is separate and was not modified.
 
 ## What's in here
 
 | File | What it is |
 |---|---|
-| `index.qmd` | Welcome page: learning outcomes, schedule, choose-your-route guidance |
-| `prepare.qmd` | Preparatory material: browser check, 15-minute primer, readings |
+| `index.qmd` | Welcome page: schedule, how it works, data |
+| `prepare.qmd` | Preparatory material: readings, browser check |
 | `00-r-warmup.qmd` | Practical 0: R basics in 10 minutes (optional) |
-| `01-spatial-data.qmd` | Practical 1: spreadsheet → map; points/lines/polygons; CRS |
-| `02-units-of-analysis.qmd` | Practical 2: aggregation, counts vs rates, classification, MAUP |
-| `03-spatial-operations.qmd` | Practical 3: select by location, buffers, points in polygon |
-| `04-spatial-dependence.qmd` | Practical 4: neighbours, spatial lag, Moran's I, LISA |
+| `01-spatial-data.qmd` | Part 1: what is place; points (police.uk API), polygons (ONS boundaries), lines (streets); neighbourhoods, street segments |
+| `02-making-maps.qmd` | Part 2: cartography; layers, map elements, counts vs rates (nomis API), classification, colour, binning |
+| `03-point-patterns.qmd` | Part 3: point patterns with `spatstat`; snap points, CSR, quadrats, kernel density, bandwidth |
+| `04-hot-spots.qmd` | Part 4: crime concentration, Getis-Ord Gi*, stability of hot spots over time |
 | `next-steps.qmd` | Resources by background (new to R / know R / practitioners) |
-| `slides/mini-lectures.qmd` | Reveal.js slides for the four ~10-minute talks (figures built from the workshop data) |
-| `data/` | Small CSV datasets (~600 KB), read from GitHub by URL |
-| `data-raw/` | Scripts that created `data/` from the module's data folder |
+| `slides/mini-lectures.qmd` | Reveal.js slides for the four talks (figures built from `data/backup/`) |
+| `data-raw/get_data.R` | Script that writes `data/` (run it yourself in RStudio) |
+| `data/leeds_streets.csv` | OpenStreetMap streets for the study area, read from GitHub by URL |
+| `data/backup/` | Copies of the live API data, in case an API is down on the day, and for the slides |
 | `_extensions/r-wasm/live` | The quarto-live extension (MIT licence), vendored |
 
-## Hosting on GitHub
+## Data
 
-The site will be at [https://maczokni.github.io/crime_mapping_workshop/](https://maczokni.github.io/crime_mapping_workshop/).
+Most data are downloaded **live** in the browser, as participants would in their own research:
 
-**Data** is read straight from the repo:
+- Crime: [police.uk API](https://data.police.uk/docs/)
+- Ward and LSOA boundaries: [ONS Open Geography Portal](https://geoportal.statistics.gov.uk/) (ArcGIS REST API)
+- Population: [nomis API](https://www.nomisweb.co.uk/api/v01/help)
+
+Streets come from OpenStreetMap (Geofabrik extract via `osmextract`), saved once as `data/leeds_streets.csv`.
+
+To create or refresh `data/`:
+
+```r
+install.packages(c("sf", "dplyr", "jsonlite", "osmextract"))
+source("data-raw/get_data.R")
+```
+
+Then commit and push `data/`. The pages read from:
 
 ```r
 data_url <- "https://raw.githubusercontent.com/maczokni/crime_mapping_workshop/main/data/"
-crimes <- read.csv(paste0(data_url, "crimes.csv"))
 ```
 
-Different repo name or account? Find and replace that URL in the `.qmd` files.
-The pages only work once the data is on GitHub.
+To use newer crime data, change `2026-07`/`2026-08` in the pages, the slides and `get_data.R`.
+
+## Hosting on GitHub
+
+The site is at [https://maczokni.github.io/crime_mapping_workshop/](https://maczokni.github.io/crime_mapping_workshop/), built by `.github/workflows/publish.yml` on every push to `main`.
 
 ## Building locally
 
@@ -50,9 +66,10 @@ The pages only work once the data is on GitHub.
 
 - Interactive blocks: ```` ```{webr} ````. Exercises: `#| exercise:`, `setup`, `.hint`, `.solution`. See the [quarto-live docs](https://r-wasm.github.io/quarto-live/).
 - Each page is its own R session. Packages are listed under `webr: packages:` in each page's YAML.
-- Exercise `setup` blocks reload their own data, so exercises work even if earlier blocks were skipped.
+- Each part starts with a "Run me first" block, so parts can be done independently.
+- In the browser, `st_read(url)` doesn't work: use `download.file(url, f)` then `st_read(f)`. Map tiles and `tmap` don't work either, so maps use `ggplot2` + `ggspatial`.
 
 ## Data and licences
 
-- See `data-raw/README.md`. All open data, Open Government Licence v3.0 (police.uk, ONS, nomis, Manchester City Council). Contains OS data © Crown copyright. Geocoding © OpenStreetMap contributors.
+- police.uk, ONS and nomis data: Open Government Licence v3.0. Contains OS data © Crown copyright and database right. Streets © OpenStreetMap contributors (ODbL).
 - Text CC BY-SA 4.0. Code MIT. quarto-live extension MIT.

@@ -1,6 +1,6 @@
 ---
 title: "An introduction to spatial thinking and analysis using R as a crime mapping tool"
-subtitle: "Half-day hands-on workshop"
+subtitle: "One-day hands-on workshop"
 toc: false
 ---
 
@@ -8,7 +8,7 @@ This workshop introduces the concepts of spatial data analysis, using crime as o
 
 Research on crime and place is very good at telling us **what** happens **where**. It is less good at telling us **why** (Bannister et al., 2019). Keep that in mind today. Every map is built on decisions about representation, and those decisions shape interpretation.
 
-We work through examples in R. All code runs in your browser, so you can edit it and see what changes.
+We work through examples in R, using open data for **Leeds**. All code runs in your browser, so you can edit it and see what changes.
 
 ## How it works
 
@@ -16,35 +16,43 @@ We work through examples in R. All code runs in your browser, so you can edit it
 - **Start Over** resets a block.
 - Exercises have `______` blanks, a hint and a solution.
 - First load downloads R into your browser (~1 min).
+- Each part starts with a **Run me first** block that loads everything you need, so you can start any part fresh.
 
 ## Plan
 
 | Time | |
 |---|---|
-| 0:00 | Welcome, browser check |
-| 0:10 | Talk 1: Thinking spatially |
-| 0:25 | [Practical 0](00-r-warmup.qmd) (optional) + [Practical 1](01-spatial-data.qmd): spreadsheet → map |
-| 1:00 | Talk 2: Units of analysis |
-| 1:10 | [Practical 2](02-units-of-analysis.qmd): counts, rates, MAUP |
-| 1:45 | *Break* |
-| 2:00 | Talk 3: Crime and place |
-| 2:10 | [Practical 3](03-spatial-operations.qmd): spatial operations |
-| 2:35 | Talk 4: Spatial dependence |
-| 2:45 | [Practical 4](04-spatial-dependence.qmd): Moran's I |
-| 3:15 | [Where next?](next-steps.qmd) |
+| **Morning** | |
+| 9:30 | Welcome, browser check |
+| 9:40 | Talk 1: What is place? |
+| 10:00 | [Practical 0](00-r-warmup.qmd) (optional), then [Part 1: What is spatial data?](01-spatial-data.qmd) |
+| 11:00 | *Break* |
+| 11:15 | Talk 2: Maps as arguments |
+| 11:30 | [Part 2: Making maps](02-making-maps.qmd) |
+| 12:30 | *Lunch* |
+| **Afternoon** | |
+| 13:30 | Talk 3: Patterns and chance |
+| 13:45 | [Part 3: Spatial point patterns](03-point-patterns.qmd) |
+| 14:45 | *Break* |
+| 15:00 | Talk 4: Hot spots in place and time |
+| 15:15 | [Part 4: Hot spots](04-hot-spots.qmd) |
+| 16:15 | [Where next?](next-steps.qmd) |
+| 16:30 | Close |
 
 ## Pick your route
 
 - **New to R:** run the code, focus on the questions.
-- **Know R:** skip Practical 0. Try the **Know R?** boxes.
+- **Know R:** skip Practical 0. Try the **Already know R?** boxes.
 
 ## Data
 
-Study area: 8 wards from Manchester city centre to Fallowfield. All open data (OGL v3).
+Study area: three wards of central Leeds: Little London & Woodhouse, Hunslet & Riverside, and Headingley & Hyde Park. We download most data live, from the same sources you would use in your own research.
 
-- Crime, June 2019: [data.police.uk](https://data.police.uk/)
-- LSOA + ward boundaries: ONS. Contains OS data © Crown copyright.
-- Population, Census 2021: [nomis](https://www.nomisweb.co.uk/)
-- Licensed premises: Manchester City Council
+- Crime, July and August 2026: [data.police.uk](https://data.police.uk/) API
+- Ward and LSOA boundaries: [ONS Open Geography Portal](https://geoportal.statistics.gov.uk/). Contains OS data © Crown copyright and database right.
+- Population, Census 2021: [nomis](https://www.nomisweb.co.uk/) API
+- Streets: © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors (ODbL)
+
+Contains public sector information licensed under the Open Government Licence v3.0.
 
 Adapted from the [Crime Mapping module](https://maczokni.github.io/crime_mapping_textbook/) (Solymosi & Medina, University of Manchester).

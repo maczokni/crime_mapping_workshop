@@ -1,0 +1,341 @@
+---
+title: "Part 4: Hot spots"
+subtitle: "Crime concentration, hot spot statistics, and whether hot spots stay hot"
+format: live-html
+engine: knitr
+webr:
+  cell-options:
+    timelimit: 240
+  packages:
+    - sf
+    - dplyr
+    - ggplot2
+    - jsonlite
+    - spdep
+---
+
+{{< include _extensions/r-wasm/live/_knitr.qmd >}}
+
+[⏱ about 60 minutes]{.timing}
+
+::: {.main-message}
+A hot spot is a place *and* a time. Before acting on one, ask: hot compared with what, at what scale, and for how long?
+:::
+
+One of the most consistent findings in criminology is that crime is **concentrated**. A small share of places accounts for a large share of crime. Weisburd (2015) called this the **law of crime concentration**: across cities and countries, around 50% of crime happens on roughly 2 to 6% of street segments. Police hot spot policing rests on this finding.
+
+In this part we:
+
+1. measure concentration in our Leeds wards
+2. find statistically significant hot spots
+3. check whether this month's hot spots were also last month's
+
+## Getting started
+
+The "Run me first" block gets all crimes for **two months**, July and August 2026, plus the study area and streets.
+
+```{webr}
+#| caption: "Run me first (repeats Part 1)"
+library(sf); library(dplyr); library(ggplot2); library(jsonlite); library(spdep)
+
+ons <- "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/"
+data_url <- "https://raw.githubusercontent.com/maczokni/crime_mapping_workshop/main/data/"
+
+download.file(paste0(ons, "WD_MAY_2026_UK_BGC/FeatureServer/0/query?where=",
+                     URLencode("LAD26NM='Leeds'", reserved = TRUE),
+                     "&outFields=WD26CD,WD26NM&outSR=4326&f=geojson"), "leeds_wards.geojson", quiet = TRUE)
+study_wards <- st_read("leeds_wards.geojson", quiet = TRUE) |>
+  filter(WD26NM %in% c("Little London & Woodhouse", "Hunslet & Riverside", "Headingley & Hyde Park"))
+study_area <- st_union(study_wards)
+
+bb <- st_bbox(study_area)
+poly <- paste0(bb["ymin"], ",", bb["xmin"], ":", bb["ymin"], ",", bb["xmax"], ":",
+               bb["ymax"], ",", bb["xmax"], ":", bb["ymax"], ",", bb["xmin"])
+
+get_crimes <- function(month, type = "all-crime") {
+  fromJSON(paste0("https://data.police.uk/api/crimes-street/", type, "?poly=", poly, "&date=", month)) |>
+    flatten() |>
+    transmute(id, category, month, longitude = as.numeric(location.longitude), latitude = as.numeric(location.latitude))
+}
+crimes <- bind_rows(get_crimes("2026-07"), get_crimes("2026-08")) |>
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) |>
+  st_filter(study_area) |>
+  st_transform(27700)
+
+study_area  <- st_transform(study_area, 27700)
+study_wards <- st_transform(study_wards, 27700)
+streets <- read.csv(paste0(data_url, "leeds_streets.csv")) |> st_as_sf(wkt = "geometry", crs = 27700)
+
+count(st_drop_geometry(crimes), month)
+```
+
+::: {.callout-note collapse="true"}
+## police.uk not responding?
+```r
+crimes <- bind_rows(read.csv(paste0(data_url, "backup/crimes_2026-07.csv")),
+                    read.csv(paste0(data_url, "backup/crimes_2026-08.csv"))) |>
+  st_as_sf(coords = c("location.longitude", "location.latitude"), crs = 4326) |>
+  st_filter(st_transform(study_area, 4326)) |>
+  st_transform(27700)
+```
+:::
+
+## How concentrated is crime?
+
+In Part 1 we gave each crime to its nearest street. Let's do that again for August, and count the crimes on each street segment:
+
+```{webr}
+august <- filter(crimes, month == "2026-08")
+
+nearest <- st_nearest_feature(august, streets)
+streets$crimes <- tabulate(nearest, nbins = nrow(streets))
+
+table(streets$crimes == 0)   # how many segments had no crime at all?
+```
+
+Most segments recorded no crime at all. Now sort the segments from most to least crime, and work out the cumulative share of crime against the cumulative share of segments:
+
+```{webr}
+concentration <- streets |>
+  st_drop_geometry() |>
+  arrange(desc(crimes)) |>
+  mutate(pct_segments = row_number() / n() * 100,
+         pct_crime    = cumsum(crimes) / sum(crimes) * 100)
+
+# what share of segments accounts for half of all crime?
+concentration |> filter(pct_crime >= 50) |> slice(1) |> pull(pct_segments)
+```
+
+This is usually drawn as a **concentration curve**. If crime were spread evenly across segments, the curve would follow the dashed diagonal. The further it bows up and to the left, the more concentrated crime is.
+
+```{webr}
+ggplot(concentration, aes(pct_segments, pct_crime)) +
+  geom_abline(linetype = "dashed", colour = "grey60") +
+  geom_line(colour = "#d7301f", linewidth = 1) +
+  geom_hline(yintercept = 50, colour = "grey40", linewidth = 0.3) +
+  labs(x = "% of street segments (most crime first)", y = "% of crime",
+       title = "Crime concentration on street segments, August 2026") +
+  coord_equal() +
+  theme_minimal()
+```
+
+::: {.callout-important}
+## Think
+Part of this concentration is made by the data, not by crime. Remember Duncan Street: police.uk snaps every crime to a fixed set of points, so segments without a snap point can never record crime. Our "segments" are also OpenStreetMap ways, which vary a lot in length. How would you check how much of the concentration is real?
+:::
+
+### Your turn: one crime type
+
+Is every crime type equally concentrated? Change the crime type and compare the share of segments that accounts for half of the crime.
+
+```{webr}
+#| setup: true
+#| exercise: ex_type
+library(sf); library(dplyr); library(ggplot2)
+if (!exists("august")) stop("Run the blocks above first.")
+```
+
+```{webr}
+#| exercise: ex_type
+my_type <- filter(august, category == "______")
+nrow(my_type)
+
+counts <- tabulate(st_nearest_feature(my_type, streets), nbins = nrow(streets))
+my_curve <- data.frame(crimes = sort(counts, decreasing = TRUE)) |>
+  mutate(pct_segments = row_number() / n() * 100,
+         pct_crime    = cumsum(crimes) / sum(crimes) * 100)
+
+my_curve |> filter(pct_crime >= 50) |> slice(1) |> pull(pct_segments)
+```
+
+::: {.hint exercise="ex_type"}
+::: {.callout-note collapse="false"}
+## Hint
+Use a category name from police.uk, such as `shoplifting`, `burglary` or `vehicle-crime`. Run `unique(august$category)` to see them all.
+:::
+:::
+
+::: {.solution exercise="ex_type"}
+::: {.callout-tip collapse="false"}
+## Solution
+```r
+my_type <- filter(august, category == "shoplifting")
+```
+:::
+:::
+
+## Finding hot spots on a grid
+
+Concentration tells us crime is uneven. To find *where*, crime analysts often count crimes in a regular grid. Here are 150 metre square cells:
+
+```{webr}
+grid <- st_make_grid(study_area, cellsize = 150) |>
+  st_sf() |>
+  st_filter(study_area)
+
+grid$crimes <- lengths(st_intersects(grid, august))
+
+ggplot() +
+  geom_sf(data = grid, aes(fill = crimes), colour = NA) +
+  geom_sf(data = study_wards, fill = NA, colour = "grey30") +
+  scale_fill_viridis_c(option = "magma", direction = -1, trans = "sqrt", name = "Crimes") +
+  theme_void()
+```
+
+The simplest definition of a hot spot is a **threshold**: for example, the top 5% of cells. But a threshold says nothing about whether a cell is *unusually* high, or just slightly higher than its neighbours.
+
+```{webr}
+cutoff <- quantile(grid$crimes, 0.95)
+cutoff
+
+grid$top5 <- grid$crimes >= cutoff
+sum(grid$crimes[grid$top5]) / sum(grid$crimes) * 100   # share of crime in the top 5% of cells
+```
+
+## Hot spots as a statistic: Getis-Ord Gi*
+
+The **Getis-Ord Gi\*** statistic asks: is the total in this cell *and its neighbours* higher than we would expect, given the overall mean? A cell surrounded by other high cells gets a high score. A single busy cell surrounded by quiet ones does not. This is a better match for the idea of a hot *spot*, which is an area, not a single point.
+
+It needs us to define **neighbours**. For a grid, the usual choice is the cells that share an edge or a corner (called *queen* contiguity, after the chess piece):
+
+```{webr}
+neighbours <- poly2nb(grid, queen = TRUE)
+neighbours
+```
+
+Gi\* includes each cell in its own neighbourhood (that is the star in Gi\*), so we add each cell to its own list of neighbours, then compute the statistic:
+
+```{webr}
+weights <- nb2listw(include.self(neighbours), style = "B", zero.policy = TRUE)
+
+grid$gi <- as.numeric(localG(grid$crimes, weights, zero.policy = TRUE))
+summary(grid$gi)
+```
+
+The values are **z-scores**. Above 1.96 is significant at the 5% level, above 2.58 at the 1% level, and above 3.29 at the 0.1% level. Let's classify and map:
+
+```{webr}
+grid <- grid |>
+  mutate(hot = cut(gi, breaks = c(-Inf, 1.96, 2.58, 3.29, Inf),
+                   labels = c("Not significant", "95%", "99%", "99.9%")))
+
+ggplot() +
+  geom_sf(data = grid, aes(fill = hot), colour = NA) +
+  geom_sf(data = streets, colour = "grey70", linewidth = 0.1) +
+  geom_sf(data = study_wards, fill = NA, colour = "grey30") +
+  scale_fill_manual(values = c("grey95", "#fdcc8a", "#fc8d59", "#d7301f"), name = "Hot spot\nconfidence") +
+  labs(title = "Crime hot spots (Getis-Ord Gi*), August 2026",
+       subtitle = "150 m grid cells, queen contiguity",
+       caption = "Crime: police.uk. Boundaries: ONS. Streets: © OpenStreetMap contributors.") +
+  theme_void()
+```
+
+::: {.callout-note collapse="true"}
+## A caution about significance
+We have just run one test per cell, several hundred tests in all. At the 95% level, about 1 in 20 cells would come out "significant" by chance alone. And neighbouring cells share neighbours, so the tests are not independent. Treat the confidence levels as a guide, not as proof. The `p.adjust()` function can correct p-values for multiple testing.
+:::
+
+### Your turn: change the cell size
+
+Rerun the hot spot analysis with different cell sizes. Do the hot spots stay in the same places?
+
+```{webr}
+#| setup: true
+#| exercise: ex_cell
+library(sf); library(dplyr); library(ggplot2); library(spdep)
+if (!exists("august")) stop("Run the blocks above first.")
+```
+
+```{webr}
+#| exercise: ex_cell
+my_grid <- st_make_grid(study_area, cellsize = ______) |>
+  st_sf() |>
+  st_filter(study_area)
+my_grid$crimes <- lengths(st_intersects(my_grid, august))
+
+my_weights <- nb2listw(include.self(poly2nb(my_grid, queen = TRUE)), style = "B", zero.policy = TRUE)
+my_grid$gi <- as.numeric(localG(my_grid$crimes, my_weights, zero.policy = TRUE))
+
+ggplot(my_grid) +
+  geom_sf(aes(fill = gi > 1.96), colour = NA) +
+  scale_fill_manual(values = c("grey95", "#d7301f"), name = "Hot spot (95%)") +
+  theme_void()
+```
+
+::: {.hint exercise="ex_cell"}
+::: {.callout-note collapse="false"}
+## Hint
+Cell size is in metres. Try `100`, then `300`.
+:::
+:::
+
+::: {.solution exercise="ex_cell"}
+::: {.callout-tip collapse="false"}
+## Solution
+```r
+my_grid <- st_make_grid(study_area, cellsize = 300) |>
+```
+:::
+:::
+
+## Do hot spots stay hot?
+
+Bannister and colleagues (2019) remind us that criminology of place often treats places as fixed, and time as an afterthought. A hot spot map is a snapshot. If we send officers to last month's hot spots, we assume they will still be hot this month.
+
+Let's test that. Compute Gi\* for July as well, using the same grid and the same neighbours:
+
+```{webr}
+july <- filter(crimes, month == "2026-07")
+grid$crimes_july <- lengths(st_intersects(grid, july))
+grid$gi_july <- as.numeric(localG(grid$crimes_july, weights, zero.policy = TRUE))
+
+grid <- grid |>
+  mutate(stability = case_when(
+    gi > 1.96 & gi_july > 1.96 ~ "Hot both months",
+    gi_july > 1.96             ~ "July only",
+    gi > 1.96                  ~ "August only",
+    TRUE                       ~ "Neither"))
+
+count(st_drop_geometry(grid), stability)
+```
+
+```{webr}
+ggplot() +
+  geom_sf(data = grid, aes(fill = stability), colour = NA) +
+  geom_sf(data = study_wards, fill = NA, colour = "grey30") +
+  scale_fill_manual(values = c("Hot both months" = "#d7301f", "July only" = "#fdae61",
+                               "August only" = "#abd9e9", "Neither" = "grey95"), name = NULL) +
+  labs(title = "Are hot spots stable from month to month?") +
+  theme_void()
+```
+
+Some hot spots are stable: usually the city centre, where crime is driven by a large, steady flow of people. Others come and go. Two months is a short time: with a year of data you can see seasonal patterns and the effect of events such as the start of the university term in Headingley and Hyde Park.
+
+::: {.callout-important}
+## Think
+- A cell that is hot in one month only: a real change, or noise?
+- What would you need to know to decide whether a hot spot is worth policing?
+- Who might be affected if the hot spot is a product of where police patrol, rather than where crime happens?
+:::
+
+## Comparing methods
+
+You have now seen four ways of finding where crime concentrates:
+
+| Method | Unit | Question it answers |
+|---|---|---|
+| Choropleth (Part 2) | administrative areas | Which areas have most crime, or the highest rate? |
+| Kernel density (Part 3) | smooth surface | Where is the intensity of crime highest? |
+| Concentration curve | street segments | How unequal is the distribution of crime? |
+| Gi\* | grid cells and their neighbours | Where are clusters of high values, beyond what we'd expect? |
+
+They will not give the same answer. Each involves decisions, about units, bandwidths, cell sizes, neighbours, time windows, which change the result. As we said this morning: report those decisions alongside the map.
+
+::: {.callout-tip collapse="true"}
+## Already know R? Stretch yourself
+1. **Local Moran's I** (LISA, Anselin 1995) also finds *cold* spots and outliers (a high cell surrounded by low ones): `localmoran(grid$crimes, nb2listw(neighbours, zero.policy = TRUE), zero.policy = TRUE)`.
+2. Repeat the Gi\* analysis on **street segments** instead of grid cells, using `spdep::dnearneigh()` on segment midpoints to define neighbours.
+3. Download a year of crime data with the `get_crimes()` function and a loop over months, and find the cells that are hot in most months. The `sfdep` package has emerging hot spot analysis for exactly this (`emerging_hotspot_analysis()`).
+:::
+
+Next: [Where next?](next-steps.qmd)

@@ -6,6 +6,7 @@ engine: knitr
 webr:
   packages:
     - dplyr
+    - jsonlite
 ---
 
 {{< include _extensions/r-wasm/live/_knitr.qmd >}}
@@ -26,24 +27,27 @@ sqrt(144)
 ## Objects
 
 ```{webr}
-n_crimes <- 3445
-n_areas <- 67
-n_crimes / n_areas
+n_crimes <- 1977
+n_wards <- 3
+n_crimes / n_wards
 ```
 
 - `<-` stores a result in an **object**.
 
 ## Data frames
 
-- Read data straight from the web:
+- Read data straight from the web. Here: crimes recorded within a mile of Leeds Town Hall in August 2026, from the police.uk API (more on APIs in Part 1).
 
 ```{webr}
-data_url <- "https://raw.githubusercontent.com/maczokni/crime_mapping_workshop/main/data/"
-crimes <- read.csv(paste0(data_url, "crimes.csv"))
+library(jsonlite)
+library(dplyr)
+
+crimes <- fromJSON("https://data.police.uk/api/crimes-street/all-crime?lat=53.7999&lng=-1.5492&date=2026-08") |>
+  flatten()
 
 nrow(crimes)
-head(crimes)
-table(crimes$crime_type)
+head(crimes$category)
+table(crimes$category)
 ```
 
 - Rows = crimes. Columns = variables.
@@ -52,55 +56,56 @@ table(crimes$crime_type)
 ## The pipe `|>` ("and then")
 
 ```{webr}
-library(dplyr)
-
 crimes |>
-  filter(crime_type == "Robbery") |>
-  count(outcome, sort = TRUE)
+  filter(category == "robbery") |>
+  count(location.street.name, sort = TRUE)
 ```
 
 - `filter()` keeps rows. `count()` tallies them.
+- "On or near Nightclub" is not a street. Hold that thought until Part 1.
 - `==` compares. A single `=` doesn't.
+- You will also see `%>%` in older code, books and the module. Same idea. `%>%` comes from the `magrittr` package (loaded with `dplyr`). `|>` has been built into R since version 4.1 (2021), so it needs no package. We use `|>`.
 
 ## Your turn
 
-Count **burglaries** by outcome.
+Which streets recorded the most **violent crime**?
 
 ```{webr}
 #| setup: true
 #| exercise: warmup_1
-library(dplyr)
-crimes <- read.csv("https://raw.githubusercontent.com/maczokni/crime_mapping_workshop/main/data/crimes.csv")
+library(dplyr); library(jsonlite)
+crimes <- flatten(fromJSON("https://data.police.uk/api/crimes-street/all-crime?lat=53.7999&lng=-1.5492&date=2026-08"))
+crimes$street_name <- crimes$location.street.name
 ```
 
 ```{webr}
 #| exercise: warmup_1
 crimes |>
-  filter(crime_type == "______") |>
+  filter(category == "______") |>
   count(______, sort = TRUE)
 ```
 
 ::: {.hint exercise="warmup_1"}
-`"Burglary"` (capital B). Count by `outcome`.
+The category is `"violent-crime"` (lower case, with a hyphen). Count by `street_name`.
 :::
 
 ::: {.solution exercise="warmup_1"}
 ```r
 crimes |>
-  filter(crime_type == "Burglary") |>
-  count(outcome, sort = TRUE)
+  filter(category == "violent-crime") |>
+  count(street_name, sort = TRUE)
 ```
 :::
 
 ## Errors are normal
 
 ```{webr}
-crimes |> filter(crime_type == "burglary") |> nrow()
+crimes |> filter(category == "Burglary") |> nrow()
 Crimes |> nrow()
 ```
 
-- Line 1: 0 rows. R is case sensitive.
+- Line 1: 0 rows. R is case sensitive: the category is `burglary`.
 - Line 2: error. There's no `Crimes`, only `crimes`.
 - Read the error. Search it online.
 
-Next: [Practical 1](01-spatial-data.qmd)
+Next: [Part 1: What is spatial data?](01-spatial-data.qmd)

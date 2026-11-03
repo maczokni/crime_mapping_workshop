@@ -1,0 +1,331 @@
+---
+title: "Part 3: Spatial point patterns"
+subtitle: "From dots on a map to intensity: quadrats, randomness and kernel density"
+format: live-html
+engine: knitr
+webr:
+  cell-options:
+    timelimit: 240
+  packages:
+    - sf
+    - dplyr
+    - ggplot2
+    - jsonlite
+    - spatstat.geom
+    - spatstat.random
+    - spatstat.explore
+---
+
+{{< include _extensions/r-wasm/live/_knitr.qmd >}}
+
+[⏱ about 60 minutes]{.timing}
+
+::: {.main-message}
+A pattern only means something compared with what chance would produce. Kernel density is a smoothing decision, not a discovery.
+:::
+
+This morning we drew crimes as points and counted them in areas. This afternoon we treat the points themselves as the data. A set of points in a defined area is a **spatial point pattern**, and there is a whole field of statistics for describing them. In criminology we are usually asking three questions:
+
+- Are the crimes **clustered**, more than we would expect by chance?
+- If so, **where** is the intensity highest?
+- How confident can we be, given how the data were made?
+
+We use the `spatstat` family of packages, the standard toolkit for point patterns in R, and the burglaries recorded in our three Leeds wards.
+
+## Getting started
+
+As in Part 2, this block repeats the steps from Part 1: the study area, the streets and, this time, burglaries for July and August 2026 (one month gives too few burglaries to work with).
+
+```{webr}
+#| caption: "Run me first (repeats Part 1)"
+library(sf); library(dplyr); library(ggplot2); library(jsonlite)
+library(spatstat.geom); library(spatstat.random); library(spatstat.explore)
+
+ons <- "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/"
+data_url <- "https://raw.githubusercontent.com/maczokni/crime_mapping_workshop/main/data/"
+
+download.file(paste0(ons, "WD_MAY_2026_UK_BGC/FeatureServer/0/query?where=",
+                     URLencode("LAD26NM='Leeds'", reserved = TRUE),
+                     "&outFields=WD26CD,WD26NM&outSR=4326&f=geojson"), "leeds_wards.geojson", quiet = TRUE)
+study_wards <- st_read("leeds_wards.geojson", quiet = TRUE) |>
+  filter(WD26NM %in% c("Little London & Woodhouse", "Hunslet & Riverside", "Headingley & Hyde Park"))
+study_area <- st_union(study_wards)
+
+bb <- st_bbox(study_area)
+poly <- paste0(bb["ymin"], ",", bb["xmin"], ":", bb["ymin"], ",", bb["xmax"], ":",
+               bb["ymax"], ",", bb["xmax"], ":", bb["ymax"], ",", bb["xmin"])
+
+# burglaries for two months, stacked into one table
+get_burglary <- function(month) {
+  fromJSON(paste0("https://data.police.uk/api/crimes-street/burglary?poly=", poly, "&date=", month)) |>
+    flatten() |>
+    transmute(id, month, longitude = as.numeric(location.longitude), latitude = as.numeric(location.latitude))
+}
+burglary <- bind_rows(get_burglary("2026-07"), get_burglary("2026-08")) |>
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) |>
+  st_filter(study_area) |>
+  st_transform(27700)
+
+study_area  <- st_transform(study_area, 27700)
+study_wards <- st_transform(study_wards, 27700)
+streets <- read.csv(paste0(data_url, "leeds_streets.csv")) |> st_as_sf(wkt = "geometry", crs = 27700)
+
+nrow(burglary)
+```
+
+::: {.callout-note collapse="true"}
+## police.uk not responding?
+```r
+burglary <- bind_rows(read.csv(paste0(data_url, "backup/crimes_2026-07.csv")),
+                      read.csv(paste0(data_url, "backup/crimes_2026-08.csv"))) |>
+  filter(category == "burglary") |>
+  st_as_sf(coords = c("location.longitude", "location.latitude"), crs = 4326) |>
+  st_filter(st_transform(study_area, 4326)) |>
+  st_transform(27700)
+```
+:::
+
+Have a look:
+
+```{webr}
+ggplot() +
+  geom_sf(data = study_area, fill = "grey97", colour = NA) +
+  geom_sf(data = streets, colour = "grey80", linewidth = 0.2) +
+  geom_sf(data = burglary, colour = "#2c7fb8", alpha = 0.6) +
+  theme_void()
+```
+
+## From `sf` to `ppp`
+
+`spatstat` does not use `sf` objects. It has its own: a **`ppp`** (planar point pattern), which is the point coordinates plus an **observation window** (`owin`), the area in which points *could* have occurred. The window matters: every statistic compares what we saw with what could have happened inside it. Our window is the study area.
+
+```{webr}
+window <- as.owin(study_area)
+burglary_ppp <- as.ppp(st_coordinates(burglary), W = window)
+burglary_ppp
+```
+
+`spatstat` works in the units of the coordinates. Ours are metres, so areas are in square metres. Let's tell it, so the output is easier to read:
+
+```{webr}
+burglary_ppp <- rescale(burglary_ppp, 1000, "km")
+window <- Window(burglary_ppp)
+summary(burglary_ppp)
+```
+
+Read the summary. The **average intensity** is the number of burglaries per square kilometre. The summary also says something about **duplicated points**.
+
+## Duplicate points: the snap point problem again
+
+Remember Duncan Street in Part 1: police.uk moves every crime to the nearest of a fixed set of snap points. So several burglaries often share exactly the same coordinates.
+
+```{webr}
+any(duplicated(burglary_ppp))
+sum(multiplicity(burglary_ppp) > 1)   # points that share their location with another
+table(multiplicity(burglary_ppp))     # how many points share each location
+```
+
+Point pattern methods assume each point is a separate location, and many of them break when points sit exactly on top of each other. The usual fix in the module is to **jitter**: move each duplicated point by a small random distance. This is a fudge, and you should say so when you use it. It acknowledges that we don't know where the crime really happened, only that it was near the snap point.
+
+```{webr}
+set.seed(2026)   # jittering is random: set a seed so we all get the same result
+burglary_jit <- rjitter(burglary_ppp, retry = TRUE, nsim = 1, drop = TRUE, radius = 0.02)   # up to 20 m
+any(duplicated(burglary_jit))
+```
+
+## Is it clustered? Comparing with randomness
+
+Points that are spread completely at random follow what statisticians call **complete spatial randomness** (CSR): every location in the window is equally likely, and each point is independent of the others. CSR is almost never true of crime. It is useful as a **benchmark**: what would the map look like if place didn't matter?
+
+`rpoispp()` simulates a random pattern with the same intensity as ours. Compare the real burglaries with a random version:
+
+```{webr}
+#| fig-width: 9
+set.seed(1)
+random_ppp <- rpoispp(intensity(burglary_jit), win = window)
+
+par(mfrow = c(1, 2), mar = c(0, 0, 2, 0))
+plot(burglary_jit, main = "Recorded burglaries", pch = 16, cex = 0.5, cols = "#2c7fb8")
+plot(random_ppp,  main = "Complete spatial randomness", pch = 16, cex = 0.5, cols = "grey30")
+```
+
+Random patterns are not even: they have gaps and accidental clumps too. This is why the eye is a poor judge of clustering, and why we need a test.
+
+### Quadrat counts
+
+The simplest approach divides the window into a grid of **quadrats**, and counts the points in each. Under CSR, the counts should be roughly equal (allowing for the cells cut by the boundary).
+
+```{webr}
+quadrats <- quadratcount(burglary_jit, nx = 6, ny = 6)
+plot(burglary_jit, pch = 16, cex = 0.4, cols = "grey50", main = "Burglaries per quadrat")
+plot(quadrats, add = TRUE, col = "#d7301f", cex = 1.2)
+```
+
+A chi-squared test compares these counts with what CSR would give:
+
+```{webr}
+quadrat.test(burglary_jit, nx = 6, ny = 6)
+```
+
+A small p-value means the counts vary far more than chance would produce: the burglaries are not randomly spread. But notice that the result depends on the grid we chose. Six by six is arbitrary. This is the MAUP again, in another form.
+
+::: {.callout-important}
+## Think
+We have rejected complete spatial randomness. Is that surprising? Homes are not randomly spread across the window either: there are none in the river or the university car parks. What would be a better benchmark for burglary?
+:::
+
+## Where? Kernel density estimation
+
+Rejecting randomness tells us *that* burglaries cluster, not *where*. For that, the most widely used tool in crime analysis is **kernel density estimation** (KDE). The idea:
+
+1. Lay a fine grid of cells over the window.
+2. Place a smooth "bump" (the **kernel**) over every point.
+3. Each cell's value is the sum of all the bumps overlapping it.
+
+The result is a smooth surface of estimated intensity: burglaries per square kilometre. The key decision is the **bandwidth** (`sigma`), the width of each bump. Let's start with 200 metres:
+
+```{webr}
+kde_200 <- density(burglary_jit, sigma = 0.2, edge = TRUE)   # 0.2 km = 200 m
+plot(kde_200, main = "Burglary intensity per km², bandwidth 200 m")
+plot(window, add = TRUE)
+```
+
+`edge = TRUE` applies an **edge correction**. Without it, the density falls off near the boundary, because half of each bump there falls outside the window, where no burglaries could be recorded.
+
+### Bandwidth is a decision
+
+Change the bandwidth and you change the map:
+
+```{webr}
+#| fig-width: 10
+#| fig-height: 4
+par(mfrow = c(1, 3), mar = c(0, 0, 2, 1))
+plot(density(burglary_jit, sigma = 0.05), main = "50 m")
+plot(density(burglary_jit, sigma = 0.2),  main = "200 m")
+plot(density(burglary_jit, sigma = 0.8),  main = "800 m")
+```
+
+Too small, and every snap point becomes its own hot spot. Too large, and everything blurs into one blob over the city centre. There are automatic methods for choosing a bandwidth. They often disagree:
+
+```{webr}
+bw.diggle(burglary_jit)   # minimises error, tends to choose small bandwidths
+bw.ppl(burglary_jit)      # likelihood cross-validation
+bw.scott(burglary_jit)    # rule of thumb, one value per axis
+```
+
+All in kilometres. There is no right answer. Choose a bandwidth that makes sense for the question (a street? a neighbourhood?), and report it.
+
+### Your turn: choose a bandwidth
+
+Try the automatic choices above, and your own values. Which one would you show to a police inspector? Why?
+
+```{webr}
+#| setup: true
+#| exercise: ex_bw
+library(spatstat.geom); library(spatstat.explore)
+if (!exists("burglary_jit")) stop("Run the blocks above first, from 'Run me first' down to the jittering.")
+```
+
+```{webr}
+#| exercise: ex_bw
+my_kde <- density(burglary_jit, sigma = ______, edge = TRUE)
+plot(my_kde, main = "My bandwidth")
+plot(Window(burglary_jit), add = TRUE)
+```
+
+::: {.hint exercise="ex_bw"}
+::: {.callout-note collapse="false"}
+## Hint
+The bandwidth is in kilometres. Try a number such as `0.1`, or the function `bw.ppl` itself (without brackets): `density()` will compute the bandwidth for you.
+:::
+:::
+
+::: {.solution exercise="ex_bw"}
+::: {.callout-tip collapse="false"}
+## Solution
+```r
+my_kde <- density(burglary_jit, sigma = bw.ppl, edge = TRUE)   # or a number, e.g. sigma = 0.15
+```
+:::
+:::
+
+## A presentable density map
+
+Base plots are fine for exploring. For a map someone else will read, we put the surface back into `ggplot2`, with the streets on top for orientation. `as.data.frame()` turns the density grid into x, y and value columns. We multiply the coordinates by 1,000 to get back from kilometres to metres, so they line up with our other layers:
+
+```{webr}
+kde_df <- as.data.frame(kde_200) |>
+  mutate(x = x * 1000, y = y * 1000)
+
+ggplot() +
+  geom_raster(data = kde_df, aes(x, y, fill = value)) +
+  geom_sf(data = streets, colour = "white", linewidth = 0.15, alpha = 0.6) +
+  geom_sf(data = study_wards, fill = NA, colour = "grey20") +
+  scale_fill_viridis_c(option = "magma", name = "Burglaries\nper km²") +
+  labs(title = "Burglary intensity, three Leeds wards",
+       subtitle = "July and August 2026. Kernel density, Gaussian kernel, bandwidth 200 m.",
+       caption = "Crime: police.uk. Boundaries: ONS. Streets: © OpenStreetMap contributors.") +
+  theme_void()
+```
+
+::: {.callout-important}
+## Think
+KDE maps are popular because they look authoritative. Before you trust one, ask:
+
+- The surface is continuous. Can burglary happen in the middle of the river?
+- Points were moved to snap points, then jittered. How much of the surface is the data, and how much is our processing?
+- The surface shows *counts*, smoothed. Where there are more homes, there will be more burglaries. Is this a map of risk, or of housing?
+:::
+
+### Your turn: another crime
+
+Copy the steps for a different crime type: `"vehicle-crime"`, `"bicycle-theft"` or `"robbery"`. Does it cluster in the same places as burglary?
+
+```{webr}
+#| setup: true
+#| exercise: ex_kde
+library(sf); library(dplyr); library(jsonlite)
+library(spatstat.geom); library(spatstat.random); library(spatstat.explore)
+if (!exists("poly")) stop("Run the 'Run me first' block at the top of the page first.")
+```
+
+```{webr}
+#| exercise: ex_kde
+my_crimes <- fromJSON(paste0("https://data.police.uk/api/crimes-street/______?poly=", poly, "&date=2026-08")) |>
+  flatten() |>
+  transmute(longitude = as.numeric(location.longitude), latitude = as.numeric(location.latitude)) |>
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) |>
+  st_transform(27700) |>
+  st_filter(study_area)
+
+my_ppp <- as.ppp(st_coordinates(my_crimes), W = as.owin(study_area)) |>
+  rescale(1000, "km") |>
+  rjitter(radius = 0.02, retry = TRUE, nsim = 1, drop = TRUE)
+
+plot(density(my_ppp, sigma = 0.2, edge = TRUE), main = "My crime type")
+```
+
+::: {.hint exercise="ex_kde"}
+::: {.callout-note collapse="false"}
+## Hint
+The crime category goes into the URL, where the blank is. For example `vehicle-crime`.
+:::
+:::
+
+::: {.solution exercise="ex_kde"}
+::: {.callout-tip collapse="false"}
+## Solution
+```r
+my_crimes <- fromJSON(paste0("https://data.police.uk/api/crimes-street/vehicle-crime?poly=", poly, "&date=2026-08")) |>
+```
+:::
+:::
+
+::: {.callout-tip collapse="true"}
+## Already know R? Stretch yourself
+1. Ripley's **K function** tests for clustering at every distance at once: `plot(envelope(burglary_jit, Kest, nsim = 39))`. Where the black line is above the grey band, burglaries cluster more than chance at that distance.
+2. Use a better benchmark than CSR: estimate the intensity of *all* crime, then test whether burglary departs from it with `relrisk()` on a marked pattern.
+3. Crime happens on streets, not across open space. The `spatstat.linnet` package does KDE along a street network (`density.lpp`), as covered in the module.
+:::
+
+Next: [Part 4: Hot spots](04-hot-spots.qmd).
