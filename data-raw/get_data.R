@@ -73,6 +73,15 @@ pop <- read.csv(paste0("https://www.nomisweb.co.uk/api/v01/dataset/NM_2021_1.dat
                        "&select=geography_code,geography_name,obs_value"))
 write.csv(pop, "data/backup/leeds_lsoa_population.csv", row.names = FALSE)
 
+# ---- 4b. Workplace population (Census 2021, WP001, nomis bulk download) ---------------
+# Not in the nomis API: it is only published as a zip file of CSVs, one per geography.
+download.file("https://www.nomisweb.co.uk/output/census/2021/wp001.zip",
+              tf <- tempfile(fileext = ".zip"), mode = "wb", quiet = TRUE)
+wp <- read.csv(unz(tf, "WP001_lsoa.csv"), check.names = FALSE)
+names(wp) <- c("LSOA21CD", "LSOA21NM", "workplace")
+wp <- wp[wp$LSOA21CD %in% leeds_lsoa$LSOA21CD, ]
+write.csv(wp, "data/backup/leeds_lsoa_workplace.csv", row.names = FALSE)
+
 # ---- 5. Streets from OpenStreetMap (Geofabrik West Yorkshire extract) ------------------
 streets <- oe_get("West Yorkshire", layer = "lines", download_directory = tempdir(),
                   boundary = study_area, boundary_type = "clipsrc", quiet = TRUE)

@@ -187,6 +187,7 @@ Now we join it to our LSOAs by the shared code, and compute crimes per 1,000 res
 
 ```{webr}
 study_lsoa <- study_lsoa |>
+  select(-any_of(c("residents", "rate"))) |>   # so this block can safely be run twice
   left_join(population, by = c("LSOA21CD" = "GEOGRAPHY_CODE")) |>
   rename(residents = OBS_VALUE) |>
   mutate(rate = crimes / residents * 1000)
@@ -209,7 +210,7 @@ ggplot(study_lsoa) +
   theme_void()
 ```
 
-The city centre still stands out, and even more strongly, because very few people *live* there. But most of the people there on a given day don't live there. The residential population is the wrong denominator for crime against shoppers and commuters. This is the **denominator dilemma**: the best denominator is the one that captures the opportunities for the crime you are mapping. Options include the workday population (Census 2021 table WD001, downloadable from nomis), estimates of ambient population (e.g. from mobile phone data), the number of homes (for burglary), or the number of cars (for vehicle crime).
+The city centre still stands out, and even more strongly, because very few people *live* there. But most of the people there on a given day don't live there. The residential population is the wrong denominator for crime against shoppers and commuters. This is the **denominator dilemma**: the best denominator is the one that captures the opportunities for the crime you are mapping. Options include the workplace population (people who work in an area: Census 2021 table WP001, a bulk download from nomis rather than the API), estimates of ambient population (e.g. from mobile phone data), the number of homes (for burglary), or the number of cars (for vehicle crime).
 
 ::: {.callout-important}
 ## Think
@@ -395,7 +396,8 @@ scale_fill_brewer(palette = "YlGnBu", name = "Crimes per\n1,000 residents")
 Some cartographers argue that **counts** should not be shown with shading at all, because a big area shaded dark looks like a lot even when it isn't. The alternative is **graduated symbols**: a circle in each area, sized by the count. `st_point_on_surface()` gives a point inside each LSOA to put the circle on:
 
 ```{webr}
-lsoa_points <- st_point_on_surface(study_lsoa)
+lsoa_points <- study_lsoa
+st_geometry(lsoa_points) <- st_point_on_surface(st_geometry(study_lsoa))   # swap each polygon for a point, keep the data
 
 ggplot() +
   geom_sf(data = study_lsoa, fill = "grey95", colour = "white") +

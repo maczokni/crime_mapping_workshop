@@ -41,6 +41,7 @@ study_lsoa <- leeds_lsoa[lengths(st_intersects(st_point_on_surface(st_geometry(l
 
 population <- read.csv(paste0(backup, "leeds_lsoa_population.csv"))
 names(population) <- toupper(names(population))
+workplace <- read.csv(paste0(backup, "leeds_lsoa_workplace.csv")) |> select(LSOA21CD, workplace)
 
 crimes <- bind_rows(read.csv(paste0(backup, "crimes_2026-07.csv")),
                     read.csv(paste0(backup, "crimes_2026-08.csv"))) |>
@@ -55,7 +56,9 @@ streets <- read_wkt("../data/leeds_streets.csv", 27700)
 study_lsoa <- study_lsoa |>
   mutate(crimes = lengths(st_intersects(study_lsoa, august))) |>
   left_join(population, by = c("LSOA21CD" = "GEOGRAPHY_CODE")) |>
-  mutate(rate = crimes / OBS_VALUE * 1000)
+  left_join(workplace, by = "LSOA21CD") |>
+  mutate(rate = crimes / OBS_VALUE * 1000,
+         rate_wp = crimes / workplace * 1000)
 
 theme_set(theme_void(base_size = 16))
 purple <- "#5b2a86"
@@ -164,10 +167,12 @@ A map is an argument. Every choice of unit, denominator, class break and colour 
 
 ## Counts or rates? The denominator dilemma
 
-```{r rates, fig.width=11, fig.height=4.8}
+```{r rates, fig.width=12, fig.height=4.8}
 two_maps <- bind_rows(
   study_lsoa |> mutate(measure = "Count", value = crimes),
-  study_lsoa |> mutate(measure = "Per 1,000 residents", value = rate)) |>
+  study_lsoa |> mutate(measure = "Per 1,000 residents", value = rate),
+  study_lsoa |> mutate(measure = "Per 1,000 workplace population", value = rate_wp)) |>
+  mutate(measure = factor(measure, levels = unique(measure))) |>
   group_by(measure) |> mutate(quintile = factor(ntile(value, 5))) |> ungroup()
 ggplot(two_maps) +
   geom_sf(aes(fill = quintile), colour = "white", linewidth = 0.1) +
@@ -175,7 +180,7 @@ ggplot(two_maps) +
   scale_fill_brewer(palette = "RdPu", name = "Quintile")
 ```
 
-Who is "at risk"? Residents, workers, shoppers, homes, cars…? The city centre has few residents and huge crowds.
+Who is "at risk"? Residents, workers, shoppers, homes, cars…? The city centre has few residents but many workers. Workplace population: Census 2021, table WP001.
 
 ## Same data, three classifications
 

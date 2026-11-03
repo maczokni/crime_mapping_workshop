@@ -13,10 +13,11 @@ We work through examples in R, using open data for **Leeds**. All code runs in y
 ## How it works
 
 - **Run Code** runs a block. Run blocks **top to bottom**.
-- **Start Over** resets a block.
+- **Start Over** resets a block's code, not R's memory.
 - Exercises have `______` blanks, a hint and a solution.
 - First load downloads R into your browser (~1 min).
 - Each part starts with a **Run me first** block that loads everything you need, so you can start any part fresh.
+- Things gone weird? **Reload the page** (a fresh R session) and run the blocks again from the top.
 
 ## Plan
 

@@ -9,6 +9,7 @@ webr:
   packages:
     - sf
     - dplyr
+    - tidyr
     - ggplot2
     - jsonlite
 ---
@@ -30,7 +31,7 @@ Run the blocks in order, from the top. Each one builds on the one before.
 These are the packages we use in this session:
 
 - `sf` for spatial data ("simple features")
-- `dplyr` for data wrangling
+- `dplyr` and `tidyr` for data wrangling
 - `ggplot2` for making maps
 - `jsonlite` for reading data from an API
 
@@ -38,6 +39,7 @@ These are the packages we use in this session:
 #| caption: "Run me first"
 library(sf)
 library(dplyr)
+library(tidyr)
 library(ggplot2)
 library(jsonlite)
 ```
@@ -265,7 +267,7 @@ leeds_lsoa <- st_read("leeds_lsoa.geojson", quiet = TRUE)
 nrow(leeds_lsoa)
 ```
 
-We keep only the LSOAs in our study area. LSOAs nest inside wards, so we can ask: whose *centre* falls inside our study area? `st_point_on_surface()` gives a point guaranteed to lie inside each polygon, and `st_intersects()` tells us which of those points are in the study area. Using the centre, rather than the whole shape, avoids picking up neighbouring LSOAs that only touch the edge (the two sets of boundaries were simplified separately, so their edges don't line up exactly).
+We keep only the LSOAs in our study area. But LSOAs do **not** nest inside wards: the two were drawn separately, so some ward boundaries cut straight through LSOAs. Whatever we do, the edge will be ragged. We ask: whose *centre* falls inside our study area? `st_point_on_surface()` gives a point guaranteed to lie inside each polygon, and `st_intersects()` tells us which of those points are in the study area. This keeps the LSOAs that are mostly inside. Using the whole shape instead would pick up every LSOA that merely touches the edge: 78 instead of 43, covering more than twice the area of our three wards.
 
 ```{webr}
 lsoa_centres <- st_point_on_surface(st_geometry(leeds_lsoa))
@@ -435,7 +437,7 @@ nrow(duncan_crimes)
 nrow(distinct(duncan_crimes, geometry))   # how many distinct points?
 
 ggplot() +
-  geom_sf(data = st_crop(streets, st_buffer(duncan, 300)), colour = "grey70") +
+  geom_sf(data = st_crop(st_geometry(streets), st_buffer(duncan, 300)), colour = "grey70") +
   geom_sf(data = duncan, colour = "black", linewidth = 1.5) +
   geom_sf(data = duncan_crimes, colour = "#d7301f", size = 3, alpha = 0.3) +
   theme_void()
@@ -494,9 +496,11 @@ lsoa_counts <- crimes_with_lsoa |>
   st_drop_geometry() |>
   count(LSOA21CD, name = "crimes")
 
-study_lsoa <- study_lsoa |>
+lsoa_crimes <- study_lsoa |>
   left_join(lsoa_counts, by = "LSOA21CD") |>
-  mutate(crimes = coalesce(crimes, 0L))   # LSOAs with no crimes get 0 rather than NA
+  mutate(crimes = replace_na(crimes, 0))   # LSOAs with no crimes get 0 rather than NA
+
+head(lsoa_crimes)
 ```
 
 And the same for wards, this time in one go. `lengths(st_intersects(polygons, points))` counts the points inside each polygon:
@@ -511,7 +515,7 @@ Now compare the same crimes, mapped at three units:
 ```{webr}
 #| fig-height: 4
 ggplot() +
-  geom_sf(data = study_lsoa, aes(fill = crimes), colour = "white", linewidth = 0.1) +
+  geom_sf(data = lsoa_crimes, aes(fill = crimes), colour = "white", linewidth = 0.1) +
   scale_fill_viridis_c(option = "magma", direction = -1) +
   labs(title = "Crimes per LSOA") +
   theme_void()
@@ -586,7 +590,10 @@ my_url <- paste0("https://data.police.uk/api/crimes-street/", "burglary",
 
 ### 2. Draw your own neighbourhood
 
-Think of a neighbourhood in Leeds that you know. Using a map app, find the latitude and longitude of four to six of its corners (in many apps you can right-click or long-press on the map to see them). Replace the coordinates below, keeping longitude first, and count the crimes inside your neighbourhood. Does your neighbourhood match any official boundary?
+Think of a neighbourhood in Leeds that you know. Using a map app, find the latitude and longitude of four to six of its corners (in many apps you can right-click or long-press on the map to see them). Replace the coordinates below and count the crimes inside your neighbourhood. Two things to watch:
+
+- **Longitude first.** Map apps usually show latitude first (e.g. `53.81, -1.55`), so swap them round: `c(-1.55, 53.81)`.
+- **In order around the edge**, clockwise or anticlockwise. If you jump across the shape, the edges cross and you get a bow-tie, which is not a valid polygon. Does your neighbourhood match any official boundary?
 
 ```{webr}
 #| setup: true
@@ -608,6 +615,8 @@ my_corners <- rbind(c(-1.5650, 53.8120),
 my_corners <- rbind(my_corners, my_corners[1, ])   # close the ring
 
 my_nbhd <- st_sfc(st_polygon(list(my_corners)), crs = 4326)
+if (!st_is_valid(my_nbhd)) stop("The edges of your shape cross. List the corners in order around the edge.")
+
 inside <- st_filter(crimes_aug, my_nbhd)
 
 nrow(inside)
@@ -622,8 +631,8 @@ ggplot() +
 ::: {.callout-tip collapse="true"}
 ## Already know R? Stretch yourself
 1. Census **Output Areas** are smaller still (about 300 residents). Request them from the portal (`Output_Areas_2021_EW_BGC_V2`, field `OA21CD`; look up the service name in the [portal's API list](https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services)) and map crimes per OA.
-2. Use `sfnetworks` to split the streets at junctions (`to_spatial_subdivision`) before counting crimes per segment. How much does the picture change?
-3. The police.uk API also has stop and search data: `https://data.police.uk/api/stops-street?poly=...&date=2026-08`. Map it alongside crime.
+2. Explore the `sfnetworks` package [https://luukvdmeer.github.io/sfnetworks/](https://luukvdmeer.github.io/sfnetworks/). You can try using it to split the streets at junctions (`to_spatial_subdivision`) before counting crimes per segment above. 
+3. The police.uk API also has stop and search data: `https://data.police.uk/api/stops-street?poly=...&date=2026-08`. Map it alongside crime or look at area-level correlations.
 :::
 
 Next: [Part 2: Making maps](02-making-maps.qmd).
