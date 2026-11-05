@@ -18,13 +18,11 @@ webr:
 
 {{< include _extensions/r-wasm/live/_knitr.qmd >}}
 
-[⏱ about 60 minutes]{.timing}
-
 ::: {.main-message}
-A map is an argument. Every choice of unit, denominator, class break and colour shapes what your reader concludes.
+"...what is also known by some cartographers is the capacity of poorly designed maps to be erroneous and misleading." Ratcliffe (2010: 17)
 :::
 
-In Part 1 we got our data onto the map. Now we think about how to make *good* maps. Historically, maps have been the main way to store and communicate spatial information, and the human eye is quick to spot patterns in a well-designed one. It is just as quick to spot patterns in a badly designed one, which is why the choices we make matter.
+In Part 1 we got our data onto a map. Now we think about how to make *good* maps. Historically, maps have been the main way to store and communicate spatial information, and the human eye is quick to spot patterns in a well-designed one. It is just as quick to spot patterns in a badly designed one, which is why the choices we make matter.
 
 We distinguish two kinds of map:
 
@@ -140,7 +138,7 @@ ggplot() +
 
 ::: {.callout-important}
 ## Think
-Point maps work well when there are few points. With thousands of crimes, points pile up and the map mostly shows where *people* are. What else could we do? Keep that question in mind for the rest of the day.
+Point maps work well when there are few points. With thousands of crimes, points pile up and the map mostly shows where *people* are. What else could we do? 
 :::
 
 ## From points to areas: choropleth maps
@@ -269,7 +267,7 @@ ggplot(classed) +
   theme_void()
 ```
 
-Same data, four maps. The equal interval map says almost everywhere is fine. The quantile map says half the area is a problem. Neither is wrong, but they invite different conclusions. Choose deliberately, and say what you chose.
+Same data, four maps. The equal interval map says almost everywhere is fine. The quantile map says half the area is a problem. Neither is wrong, but they invite different conclusions. Choose deliberately, and be explicit about what you chose and *why*.
 
 ### Your turn: try other classifications
 
@@ -517,4 +515,4 @@ ggplot() +
 4. Compare `scale_fill_fermenter()`, which bins a continuous variable into classed colours directly in `ggplot2`.
 :::
 
-Next: [Part 3: Spatial point patterns](03-point-patterns.qmd).
+Next: [Part 3: Spatial autocorrelation](03-spatial-autocorrelation.qmd).

@@ -1,6 +1,6 @@
 ---
 title: "An introduction to spatial thinking and analysis using R as a crime mapping tool"
-subtitle: "One-day workshop"
+subtitle: ""
 format:
   revealjs:
     theme: [default, slides.scss]
@@ -50,6 +50,7 @@ crimes <- bind_rows(read.csv(paste0(backup, "crimes_2026-07.csv")),
   st_transform(27700) |>
   st_filter(study_area)
 august <- filter(crimes, month == "2026-08")
+burglary <- filter(crimes, category == "burglary")   # July and August
 
 streets <- read_wkt("../data/leeds_streets.csv", 27700)
 
@@ -69,7 +70,7 @@ purple <- "#5b2a86"
 ## {.mm-slide}
 
 ::: {.mm}
-Place is not a given. Every way of putting crime on the map is a decision about what counts as a place.
+"We are too far along in the scientific study of crime and place to leave unit of analysis to the serendipitous interest of singular scholars." (Weisburd, Bruinsma & Bernasco, 2009, p. 5)
 :::
 
 ## What, where … and why?
@@ -77,8 +78,8 @@ Place is not a given. Every way of putting crime on the map is a decision about 
 - Criminology of place: crime is concentrated at **micro-places** (street segments, hot spots).
 - Strong on **what** happens **where**.
 - Weaker on **why** (Bannister, O'Sullivan & Bates, 2019).
-- Place is treated as a container. But places have histories, uses, meanings, and they change over **time**.
-- Today's thread: **representation → analytical decisions → interpretation**.
+- Places have histories, uses, meanings, and they change over **time**.
+
 
 ## Spatial data = attributes + location
 
@@ -107,21 +108,6 @@ ggplot() +
 :::
 ::::
 
-## The data are already a representation
-
-```{r snap}
-top_snap <- august |>
-  st_drop_geometry() |>
-  count(location.street.name, sort = TRUE) |>
-  slice(1)
-n_points <- nrow(distinct(as.data.frame(st_coordinates(august))))
-```
-
-- police.uk moves each crime to the nearest of a fixed set of **snap points**, to protect victims.
-- In August 2026, `r nrow(august)` crimes in our three Leeds wards sit on just **`r n_points` distinct points**.
-- The busiest "street": **`r top_snap$location.street.name`**, with `r top_snap$n` crimes.
-- Crime data record only what is **reported and recorded**.
-- Boundaries were drawn by someone, for some purpose: census, policing, elections.
 
 ## What is a neighbourhood?
 
@@ -148,6 +134,20 @@ ggplot(two) +
 :::
 ::::
 
+## The data are already a representation
+
+```{r snap}
+top_snap <- august |>
+  st_drop_geometry() |>
+  count(location.street.name, sort = TRUE) |>
+  slice(1)
+n_points <- nrow(distinct(as.data.frame(st_coordinates(august))))
+```
+
+- police.uk moves each crime to the nearest of a fixed set of **snap points**, to protect victims.
+- In August 2026, `r nrow(august)` crimes in our three Leeds wards sit on just **`r n_points` distinct points**.
+- Crime data record only what is **reported and recorded**.
+
 ➜ **Practical 0** (if new to R) and **Part 1**
 
 # Talk 2: Maps as arguments {background-color="#5b2a86"}
@@ -155,7 +155,7 @@ ggplot(two) +
 ## {.mm-slide}
 
 ::: {.mm}
-A map is an argument. Every choice of unit, denominator, class break and colour shapes what your reader concludes.
+"Making sensible judgments about how you represent your data … will help your web map tell the right story." Field (2012)
 :::
 
 ## Reference and thematic maps
@@ -163,7 +163,7 @@ A map is an argument. Every choice of unit, denominator, class break and colour 
 - **Reference maps** show where things are: streets, rivers, boundaries.
 - **Thematic maps** show how something varies across space: crime, rates, populations.
 - A good crime map is a thematic layer on a light reference base, with a clear **visual hierarchy**.
-- Every map someone else reads needs: title, legend, scale, north arrow (if not obvious), **sources**.
+- Every map someone else reads needs: title, legend, scale, **sources**.
 
 ## Counts or rates? The denominator dilemma
 
@@ -200,6 +200,22 @@ ggplot(classified) +
 
 Crimes per 1,000 residents, August 2026. Calm or alarming? It depends on the break points.
 
+## Where the breaks fall
+
+```{r class-breaks, fig.width=12, fig.height=6}
+methods <- c("Equal interval" = "equal", "Quantile" = "quantile", "Natural breaks (Jenks)" = "jenks")
+break_lines <- bind_rows(lapply(names(methods), function(m)
+  data.frame(method = m, brk = classIntervals(study_lsoa$rate, n = 5, style = methods[[m]])$brks)))
+ggplot(classified, aes(rate, fill = factor(class))) +
+  geom_histogram(bins = 30, colour = "grey60", linewidth = 0.2) +
+  geom_vline(data = break_lines, aes(xintercept = brk), colour = "grey20", linewidth = 0.6) +
+  facet_wrap(~ method, ncol = 1) +
+  # scale_x_sqrt() +
+  scale_fill_brewer(palette = "RdPu", name = "Class\n(1 = lowest)") +
+  labs(x = "Crimes per 1,000 residents", y = "Number of LSOAs") +
+  theme_minimal(base_size = 16)
+```
+
 ## Colour
 
 - **Sequential**: low to high (counts, rates).
@@ -210,141 +226,147 @@ Crimes per 1,000 residents, August 2026. Calm or alarming? It depends on the bre
 
 ➜ **Part 2**
 
-# Talk 3: Patterns and chance {background-color="#5b2a86"}
+# Talk 3: Near and far {background-color="#5b2a86"}
 
 ## {.mm-slide}
 
 ::: {.mm}
-A pattern only means something compared with what chance would produce. Kernel density is a smoothing decision, not a discovery.
+"Everything is related to everything else, but near things are more related than distant things." Tobler (1970)
 :::
 
-## Spot the real pattern
+## Tobler's first law of geography
 
-```{r game, fig.width=12, fig.height=4.5}
-burglary <- filter(crimes, category == "burglary")
-set.seed(2026)
-real_panel <- sample(1:4, 1)
-game <- bind_rows(lapply(1:4, function(i) {
-  pts <- if (i == real_panel) st_geometry(burglary) else st_sample(study_area, nrow(burglary))
-  st_sf(panel = paste("Pattern", LETTERS[i]), geometry = pts)
-}))
-ggplot() +
-  geom_sf(data = study_area, fill = "grey96", colour = "grey70") +
-  geom_sf(data = game, size = 0.6, colour = purple) +
-  facet_wrap(~ panel, nrow = 1)
-```
+- **Spatial autocorrelation**: the correlation among values that comes from their relative location.
+- **Positive**: neighbours are alike (high next to high). Usual for crime.
+- **Negative**: neighbours are unlike, like a chessboard. Rare.
+- It matters **substantively** (clustering, spillover, shared causes) and **statistically** (observations are not independent).
 
-One pattern is the burglaries recorded in July and August 2026. The others are **complete spatial randomness**. Which is real?
+## What is a neighbour?
 
-## Answer: Pattern `r LETTERS[real_panel]`
-
-- Random patterns have clumps and gaps too. The eye is a poor judge.
-- **Complete spatial randomness** (CSR) is the benchmark: every location equally likely.
-- CSR is never true of crime (homes aren't spread at random either). It is a reference point, not a theory.
-- Tests: quadrat counts, Ripley's K, simulation envelopes.
-
-## Kernel density: bandwidth is a decision
-
-```{r kde, fig.width=12, fig.height=4.5}
-set.seed(2026)
-burglary_jit <- st_jitter(burglary, amount = 20)   # move each point up to 20 m off its snap point
-xy <- as.data.frame(st_coordinates(burglary_jit))
-bb <- st_bbox(study_area)
-kde_panel <- function(h, label) {
-  k <- MASS::kde2d(xy$X, xy$Y, h = c(h, h), n = 150, lims = bb[c("xmin", "xmax", "ymin", "ymax")])
-  cells <- expand.grid(X = k$x, Y = k$y)
-  cells$density <- as.vector(k$z)
-  inside <- lengths(st_intersects(st_as_sf(cells, coords = c("X", "Y"), crs = 27700), study_area)) > 0
-  cells <- cells[inside & cells$density > 0.05 * max(cells$density), ]   # drop cells outside the area or near zero
-  ggplot() +
-    geom_raster(data = cells, aes(X, Y, fill = density)) +
-    geom_sf(data = study_area, fill = NA, colour = "grey30") +
-    scale_fill_viridis_c(option = "magma", direction = -1, guide = "none") +
-    labs(title = label) +
-    theme(plot.title = element_text(hjust = 0.5))
+```{r neighbours, fig.width=11, fig.height=5.2}
+grid5 <- st_make_grid(st_as_sfc(st_bbox(c(xmin = 0, ymin = 0, xmax = 5, ymax = 5))), n = c(5, 5)) |> st_sf()
+centre <- 13
+label_nb <- function(nb, criterion) {
+  grid5 |> mutate(criterion = criterion,
+                  contiguity = case_when(row_number() == centre ~ "Area itself",
+                                         row_number() %in% nb[[centre]] ~ "First order",
+                                         row_number() %in% nblag(nb, 2)[[2]][[centre]] ~ "Second order",
+                                         TRUE ~ "Not a neighbour"))
 }
-patchwork::wrap_plots(kde_panel(200, "Narrow"), kde_panel(800, "Medium"), kde_panel(3200, "Wide"), nrow = 1)
+bind_rows(label_nb(poly2nb(grid5, queen = FALSE), "Rook: shares an edge"),
+          label_nb(poly2nb(grid5, queen = TRUE), "Queen: shares an edge or a corner")) |>
+  mutate(contiguity = factor(contiguity, levels = c("Area itself", "First order", "Second order", "Not a neighbour"))) |>
+  ggplot() +
+  geom_sf(aes(fill = contiguity), colour = "black") +
+  facet_wrap(~ criterion) +
+  scale_fill_manual(values = c("Area itself" = "#b2df8a", "First order" = "#1f78b4",
+                               "Second order" = "#a6cee3", "Not a neighbour" = "white"), name = NULL) +
+  theme(legend.position = "bottom", strip.text = element_text(size = 16))
 ```
 
-Burglaries jittered up to 20 m off their snap points. Too narrow: every snap point is a hot spot. Too wide: one blob over the city centre. Choose for the question, and **report it**.
+Contiguity (rook, queen, and its order) is the most common definition. Others: distance (within 500 m, the 5 nearest), travel time, flows of people.
 
-## Before you trust a density map
+## The spatial weights matrix
 
-- **Window**: where *could* crime have happened? (Not in the river.)
-- **Snap points and duplicates**: jittering is a fudge. Say so.
-- **Edges**: density drops at the boundary unless corrected.
-- **Counts, smoothed**: more homes, more burglaries. Risk, or housing?
+```{r toy}
+toy <- st_make_grid(st_as_sfc(st_bbox(c(xmin = 0, ymin = 0, xmax = 3, ymax = 2))), n = c(3, 2)) |> st_sf()
+toy$id <- c("D", "E", "F", "A", "B", "C")   # the grid starts bottom left, so label the top row A-C
+nb_toy <- poly2nb(toy, queen = FALSE)
+abc <- order(toy$id)
+w_b <- nb2mat(nb_toy, style = "B"); dimnames(w_b) <- list(toy$id, toy$id); w_b <- w_b[abc, abc]
+w_w <- nb2mat(nb_toy, style = "W"); dimnames(w_w) <- list(toy$id, toy$id); w_w <- w_w[abc, abc]
+```
 
-➜ **Part 3**
-
-# Talk 4: Hot spots in place and time {background-color="#5b2a86"}
-
-## {.mm-slide}
-
-::: {.mm}
-A hot spot is a place *and* a time. Before acting on one, ask: hot compared with what, at what scale, and for how long?
+:::: {.columns}
+::: {.column width="24%"}
+```{r toy-map, fig.width=3, fig.height=2.4}
+ggplot(toy) +
+  geom_sf(fill = "#efe7f6", colour = purple, linewidth = 1) +
+  geom_sf_text(aes(label = id), size = 9, colour = purple)
+```
+Rook neighbours
 :::
 
-## The law of crime concentration
+::: {.column width="38%"}
+**Binary** (`style = "B"`)
 
-```{r concentration}
-seg_counts <- tabulate(st_nearest_feature(august, streets), nbins = nrow(streets))
-sorted <- sort(seg_counts, decreasing = TRUE)
-k <- which(cumsum(sorted) >= sum(sorted) / 2)[1]
-pct <- round(100 * k / length(sorted), 1)
-curve_df <- data.frame(pct_seg = seq_along(sorted) / length(sorted) * 100,
-                       pct_crime = cumsum(sorted) / sum(sorted) * 100)
+```{r toy-b}
+knitr::kable(w_b)
+```
+1 = neighbour. Symmetrical. Rows sum to the number of neighbours.
+:::
+
+::: {.column width="38%"}
+**Row-standardised** (`style = "W"`)
+
+```{r toy-w}
+knitr::kable(round(w_w, 2))
+```
+Each row sums to 1: the **average** of the neighbours. Not symmetrical.
+:::
+::::
+
+## Neighbours in our LSOAs
+
+```{r lsoa-nb}
+nb_lsoa <- poly2nb(study_lsoa, queen = TRUE)
+lsoa_centres <- st_point_on_surface(st_geometry(study_lsoa))
+links <- nb2lines(nb_lsoa, coords = lsoa_centres, as_sf = TRUE)
+```
+
+:::: {.columns}
+::: {.column width="35%"}
+- Queen contiguity, `r nrow(study_lsoa)` LSOAs.
+- `r sum(card(nb_lsoa))` links: on average `r round(mean(card(nb_lsoa)), 1)` neighbours each.
+- Each line joins the centres of two LSOAs that touch.
+- **Edge effect**: LSOAs at the boundary lose their neighbours outside the study area.
+:::
+
+::: {.column width="65%"}
+```{r lsoa-nb-map, fig.width=7, fig.height=6}
+ggplot() +
+  geom_sf(data = study_lsoa, fill = "grey95", colour = "grey60") +
+  geom_sf(data = links, colour = "#d7301f", linewidth = 0.6) +
+  geom_sf(data = lsoa_centres, size = 1.2)
+```
+:::
+::::
+
+## From neighbours to Moran's I
+
+```{r moran}
+study_lsoa$burglary <- lengths(st_intersects(study_lsoa, burglary))
+w_lsoa <- nb2listw(nb_lsoa, style = "W")
+study_lsoa$burglary_lag <- lag.listw(w_lsoa, study_lsoa$burglary)
+set.seed(2026)
+mt <- moran.mc(study_lsoa$burglary, w_lsoa, nsim = 999)
 ```
 
 :::: {.columns}
 ::: {.column width="45%"}
-- Across cities, about half of crime happens on 2 to 6% of street segments (Weisburd, 2015).
-- Our three Leeds wards, August 2026: **half of all crime on `r pct`% of street segments**.
-- Some of that is the data: snap points concentrate crime by design.
+- **Spatial lag**: the average value of an area's neighbours (row-standardised weights × values).
+- **Moran's I**: how strongly values go with their spatial lag.
+- Burglary per LSOA, July–August 2026: **I = `r round(mt$statistic, 2)`**, p = `r round(mt$p.value, 3)` (999 random shuffles).
+- Global: *how much* clustering, not *where*.
 :::
 
 ::: {.column width="55%"}
-```{r concentration-curve, fig.width=6, fig.height=5.5}
-ggplot(curve_df, aes(pct_seg, pct_crime)) +
-  geom_abline(linetype = "dashed", colour = "grey60") +
-  geom_line(colour = "#d7301f", linewidth = 1.2) +
-  labs(x = "% of street segments", y = "% of crime") +
-  coord_equal() +
+```{r moran-plot, fig.width=6, fig.height=5}
+ggplot(st_drop_geometry(study_lsoa), aes(burglary, burglary_lag)) +
+  geom_point(alpha = 0.7, size = 2) +
+  geom_smooth(method = "lm", formula = y ~ x, se = FALSE, colour = "#d7301f") +
+  labs(x = "Burglaries in the LSOA", y = "Average in its neighbours") +
   theme_minimal(base_size = 16)
 ```
 :::
 ::::
 
-## From threshold to statistic: Getis-Ord Gi*
+## Why it matters: regression
 
-- **Threshold**: the top 5% of grid cells. Simple, but says nothing about *unusual*.
-- **Gi\***: is the total in this cell *and its neighbours* higher than expected?
-- Needs **neighbours** (e.g. queen contiguity) and a **scale** (cell size).
-- Output: z-scores. Above 1.96 ≈ 95% confidence.
-- Hundreds of tests at once: expect some false positives.
+- Regression assumes **independent** observations. Neighbouring areas are not.
+- Ignore it: standard errors too small, effects "significant" that aren't.
+- Check: map the model's **residuals**, and test them with Moran's I using the same weights.
+- If needed: **spatial lag** and **spatial error** models build $W$ into the model.
+- Every result rests on the decision: who is a neighbour, and how much do they count?
 
-## Do hot spots stay hot?
-
-```{r stability, fig.width=7, fig.height=5.5}
-grid <- st_make_grid(study_area, cellsize = 150) |> st_sf() |> st_filter(study_area)
-w <- nb2listw(include.self(poly2nb(grid, queen = TRUE)), style = "B", zero.policy = TRUE)
-gi_for <- function(m) as.numeric(localG(lengths(st_intersects(grid, filter(crimes, month == m))), w, zero.policy = TRUE))
-grid <- grid |>
-  mutate(jul = gi_for("2026-07") > 1.96, aug = gi_for("2026-08") > 1.96,
-         stability = case_when(jul & aug ~ "Hot both months", jul ~ "July only",
-                               aug ~ "August only", TRUE ~ "Neither"))
-ggplot() +
-  geom_sf(data = grid, aes(fill = stability), colour = NA) +
-  geom_sf(data = study_wards, fill = NA, colour = "grey30") +
-  scale_fill_manual(values = c("Hot both months" = "#d7301f", "July only" = "#fdae61",
-                               "August only" = "#abd9e9", "Neither" = "grey95"), name = NULL)
-```
-
-## Place *and* time
-
-- A hot spot map is a snapshot. Policing it assumes the future looks like the past.
-- Places change: term starts in Headingley, events in the city centre, the night-time economy.
-- Recorded crime reflects where police look. Hot spots can be **self-reinforcing**.
-- Data do not speak for themselves. They need theory, and attention to *why* (Bannister et al., 2019).
-
-➜ **Part 4**, then **Where next?**
+➜ **Part 3**, then **Where next?**

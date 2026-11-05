@@ -14,9 +14,9 @@ webr:
 
 ## Preparatory material
 
-This book chapter on [“Crime Mapping: Spatial and Temporal Challenges”](https://www.librarysearch.manchester.ac.uk/permalink/44MAN_INST/1rfd42k/cdi_springer_books_10_1007_978_0_387_77650_7_2) from 2009 by Jerry Ratcliffe in the Handbook of Quantitative Criminology provides a brief but useful introduction to the relevance of crime mapping for criminology research and criminal justice practice.
-
-* Those taking the course as a postgraduate course unit ought to watch also this [16 minute lecture (Links to YouTube)](https://www.youtube.com/watch?v=dheAqmXvoBY) by Luc Anselin on “Geospatial Visualisation and ESDA”.
+If you have a chance and access the following preparation could help ive some context/ background for the day: 
+- Ratcliffe, J. H. (2010). Crime mapping: Spatial and temporal challenges. In A. R. Piquero & D. Weisburd (Eds.), *Handbook of quantitative criminology* (pp. 5–24). Springer.
+- Luc Anselin's [16 minute lecture (Links to YouTube)](https://www.youtube.com/watch?v=dheAqmXvoBY) "Geospatial Visualisation and ESDA".
 
 ## Browser check
 

@@ -19,8 +19,7 @@ is separate and was not modified.
 | `00-r-warmup.qmd` | Practical 0: R basics in 10 minutes (optional) |
 | `01-spatial-data.qmd` | Part 1: what is place; points (police.uk API), polygons (ONS boundaries), lines (streets); neighbourhoods, street segments |
 | `02-making-maps.qmd` | Part 2: cartography; layers, map elements, counts vs rates (nomis API), classification, colour, binning |
-| `03-point-patterns.qmd` | Part 3: point patterns with `spatstat`; snap points, CSR, quadrats, kernel density, bandwidth |
-| `04-hot-spots.qmd` | Part 4: crime concentration, Getis-Ord Gi*, stability of hot spots over time |
+| `03-spatial-autocorrelation.qmd` | Part 3: neighbours (rook and queen contiguity), spatial weights matrices (binary and row-standardised), spatial lag, Moran's I; autocorrelation in regression |
 | `next-steps.qmd` | Resources by background (new to R / know R / practitioners) |
 | `slides/mini-lectures.qmd` | Reveal.js slides for the four talks (figures built from `data/backup/`) |
 | `data-raw/get_data.R` | Script that writes `data/` (run it yourself in RStudio) |

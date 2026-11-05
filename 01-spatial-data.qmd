@@ -16,13 +16,12 @@ webr:
 
 {{< include _extensions/r-wasm/live/_knitr.qmd >}}
 
-[⏱ about 75 minutes]{.timing}
 
 ::: {.main-message}
-Place is not a given. Every way of putting crime on the map is a decision about what counts as a place.
+"Criminologists have long been interested in the variability of crime at place, but they have given little thought to the level of geography that should be used in exploring such relationships." Weisburd, Bruinsma & Bernasco (2009: 4)
 :::
 
-In this session we take some regular crime data for Leeds and work out how we can put it on the map. Along the way we meet the three building blocks of vector spatial data (**points**, **lines** and **polygons**), we get our data straight from the source (**police.uk** and the **ONS**), and we spend some time on a question that is easy to skip: when we say crime happens in a *place*, what is that place?
+In this session we take some  crime data for Leeds and work out how we can put it on the map. Along the way we meet the three building blocks of vector spatial data (**points**, **lines** and **polygons**), we get our data straight from the source (**police.uk** and the **ONS**), and we spend some time on a key question: when we say crime happens in a *place*, how do we go about defining this "place"?
 
 Run the blocks in order, from the top. Each one builds on the one before.
 
@@ -48,18 +47,18 @@ library(jsonlite)
 
 Geospatial analysis is about *what happens where*. Three ideas help us talk about it:
 
-- **Place**: where something is. People talk about places by name ("Hyde Park", "the city centre"), but to analyse them we need a coordinate system that pins a location down unambiguously.
+- **Place**: where something is. People talk about places by name ("Hyde Park", "the city centre"), but to analyse them we need to operationalise these places.
 - **Attributes**: the things we record about a place, such as the type of crime, the number of burglaries, or the population. These live in an ordinary table: rows are observations, columns are variables.
 - **Objects**: how we represent places in a computer. In the *vector* model there are three kinds:
     - **points**: a pair of coordinates (a crime, a pub, a bus stop)
     - **lines**: an ordered sequence of points joined up (a street, a river, a bus route)
     - **polygons**: a closed ring of points (a neighbourhood, a ward, a police beat)
 
-The alternative is the *raster* model, a grid of cells each holding a value, like a photograph. We will meet a raster in Part 3, when we estimate crime density.
+The alternative is the *raster* model, a grid of cells each holding a value. In crime mapping, kernel density estimation visuals use raster data for example. We do not use this today. 
 
-We will now meet each of the three vector objects using real data for Leeds.
+We will get some crime data for Leeds.
 
-## Points: crime from the police.uk API
+## Crime from the police.uk API
 
 ### What is an API?
 
@@ -175,7 +174,7 @@ There are far fewer locations than crimes. To protect victims' privacy, police.u
 crimes |> count(street_name, sort = TRUE) |> head(10)
 ```
 
-So our "points" are not where crimes happened. They are where crimes were *put* for publication. That matters a lot once we analyse patterns at fine scales, as we will in the afternoon. (If you are interested, Tompson et al., 2015, in [where next](next-steps.qmd), tested how far these locations move.)
+So our "points" are not where crimes happened. They are where crimes were *put* for publication. That matters a lot once we analyse patterns at fine scales, as we will in the afternoon. (If you are interested, Tompson et al., 2015 (see readings in [where next](next-steps.qmd)), tested how reliable these data are at different units of analysis)
 
 ::: {.callout-important}
 ## Think
@@ -469,7 +468,7 @@ ggplot() +
   theme_void()
 ```
 
-Most streets have no recorded crime at all, and a handful have a lot. Keep that in mind: we come back to it in Part 4.
+Most streets have no recorded crime at all, and a handful have a lot.
 
 ::: {.callout-note collapse="true"}
 ## A caveat about OpenStreetMap "streets"
@@ -531,7 +530,7 @@ At ward level, the city centre swallows everything around it. At LSOA level, a f
 
 ::: {.callout-important}
 ## Think
-If you were studying night-time violence, which unit would you choose: snap point, street segment, LSOA, ward or police neighbourhood? What if you were studying the effect of poverty on burglary? Why might the answer differ?
+If you were studying violence in the night time economy, which unit would you choose: snap point, street segment, LSOA, ward or police neighbourhood? What if you were studying the effect of poverty on burglary? Why might the answer differ?
 :::
 
 ## Your turn
@@ -588,47 +587,6 @@ my_url <- paste0("https://data.police.uk/api/crimes-street/", "burglary",
 :::
 :::
 
-### 2. Draw your own neighbourhood
-
-Think of a neighbourhood in Leeds that you know. Using a map app, find the latitude and longitude of four to six of its corners (in many apps you can right-click or long-press on the map to see them). Replace the coordinates below and count the crimes inside your neighbourhood. Two things to watch:
-
-- **Longitude first.** Map apps usually show latitude first (e.g. `53.81, -1.55`), so swap them round: `c(-1.55, 53.81)`.
-- **In order around the edge**, clockwise or anticlockwise. If you jump across the shape, the edges cross and you get a bow-tie, which is not a valid polygon. Does your neighbourhood match any official boundary?
-
-```{webr}
-#| setup: true
-#| exercise: ex_draw
-library(sf); library(dplyr); library(ggplot2); library(jsonlite)
-crimes_aug <- fromJSON("https://data.police.uk/api/crimes-street/all-crime?poly=53.7555,-1.5905:53.7555,-1.4820:53.8242,-1.4820:53.8242,-1.5905&date=2026-08") |>
-  flatten() |>
-  transmute(category, longitude = as.numeric(location.longitude), latitude = as.numeric(location.latitude)) |>
-  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
-```
-
-```{webr}
-#| exercise: ex_draw
-# longitude, latitude of each corner, in order around the edge
-my_corners <- rbind(c(-1.5650, 53.8120),
-                    c(-1.5520, 53.8120),
-                    c(-1.5520, 53.8040),
-                    c(-1.5650, 53.8040))
-my_corners <- rbind(my_corners, my_corners[1, ])   # close the ring
-
-my_nbhd <- st_sfc(st_polygon(list(my_corners)), crs = 4326)
-if (!st_is_valid(my_nbhd)) stop("The edges of your shape cross. List the corners in order around the edge.")
-
-inside <- st_filter(crimes_aug, my_nbhd)
-
-nrow(inside)
-inside |> st_drop_geometry() |> count(category, sort = TRUE)
-
-ggplot() +
-  geom_sf(data = my_nbhd, fill = "#f1eaf8") +
-  geom_sf(data = inside, colour = "#5b2a86") +
-  theme_void()
-```
-
-::: {.callout-tip collapse="true"}
 ## Already know R? Stretch yourself
 1. Census **Output Areas** are smaller still (about 300 residents). Request them from the portal (`Output_Areas_2021_EW_BGC_V2`, field `OA21CD`; look up the service name in the [portal's API list](https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services)) and map crimes per OA.
 2. Explore the `sfnetworks` package [https://luukvdmeer.github.io/sfnetworks/](https://luukvdmeer.github.io/sfnetworks/). You can try using it to split the streets at junctions (`to_spatial_subdivision`) before counting crimes per segment above. 
