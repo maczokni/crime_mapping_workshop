@@ -14,7 +14,8 @@ webr:
 
 ## Preparatory material
 
-If you have a chance and access the following preparation could help ive some context/ background for the day: 
+If you have a chance and access the following preparation could help ive some context/ background for the day:
+
 - Ratcliffe, J. H. (2010). Crime mapping: Spatial and temporal challenges. In A. R. Piquero & D. Weisburd (Eds.), *Handbook of quantitative criminology* (pp. 5–24). Springer.
 - Luc Anselin's [16 minute lecture (Links to YouTube)](https://www.youtube.com/watch?v=dheAqmXvoBY) "Geospatial Visualisation and ESDA".
 

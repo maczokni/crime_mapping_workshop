@@ -1,6 +1,6 @@
 /*-- scss:defaults --*/
-$primary: #5b2a86;
-$link-color: #5b2a86;
+$primary: #660099;
+$link-color: #660099;
 $font-size-root: 17px;
 
 /*-- scss:rules --*/
@@ -14,8 +14,8 @@ $font-size-root: 17px;
   display: inline-block;
   font-size: 0.85rem;
   font-weight: 600;
-  color: #5b2a86;
-  background: #f1eaf8;
+  color: #660099;
+  background: #E7E1F0;
   border-radius: 4px;
   padding: 0.1rem 0.5rem;
   margin-bottom: 0.75rem;
@@ -29,11 +29,11 @@ $font-size-root: 17px;
 }
 
 .pathways > div {
-  border: 1px solid #ddd;
-  border-left: 4px solid #5b2a86;
+  border: 1px solid #E7E1F0;
+  border-left: 4px solid #660099;
   border-radius: 4px;
   padding: 0.75rem 1rem;
-  background: #fcfbfe;
+  background: #E7E1F0;
 }
 
 .pathways h4 {
@@ -50,9 +50,9 @@ table.schedule td:first-child {
   font-size: 1.35rem;
   font-weight: 600;
   line-height: 1.4;
-  color: #3b1a5a;
-  border-left: 6px solid #5b2a86;
-  background: #f6f1fb;
+  color: #660099;
+  border-left: 6px solid #FFCC33;
+  background: #E7E1F0;
   padding: 0.9rem 1.2rem;
   margin: 0.5rem 0 1.75rem 0;
 }

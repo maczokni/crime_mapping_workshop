@@ -22,13 +22,10 @@ We work through examples in R, using open data for Leeds. All code runs in your 
 - Talk 1: Defining place
 - [Practical 0](00-r-warmup.qmd) (optional), then 
 - [Part 1: What is spatial data?](01-spatial-data.qmd) 
-
 - Talk 2: Making maps 
 - [Part 2: Making maps](02-making-maps.qmd) 
-
 - Talk 3: Spatial autocorrelation
 - [Part 3: Spatial autocorrelation](03-spatial-autocorrelation.qmd) 
-
 - [Where next?](next-steps.qmd) 
 
 
