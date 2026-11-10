@@ -1,6 +1,10 @@
 ---
 title: "An introduction to spatial thinking and analysis using R as a crime mapping tool"
 subtitle: "The full day: all practicals, with code and outputs"
+author:
+  - name: Reka Solymosi
+    url: https://rekadata.net
+    email: reka.solymosi@manchester.ac.uk
 format:
   html:
     toc: true
