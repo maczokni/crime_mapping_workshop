@@ -1,0 +1,1525 @@
+---
+title: "An introduction to spatial thinking and analysis using R as a crime mapping tool"
+subtitle: "The full day: all practicals, with code and outputs"
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    toc-location: left
+    embed-resources: true
+    code-copy: true
+    theme: cosmo
+    mainfont: "Helvetica Neue, Helvetica, Arial, sans-serif"
+    html-math-method: plain
+    include-in-header:
+      text: |
+        <style>
+        .main-message { font-size: 1.3rem; font-weight: 600; line-height: 1.4; color: #660099;
+          border-left: 6px solid #FFCC33; background: #E7E1F0; padding: 0.9rem 1.2rem; margin: 0.5rem 0 1.5rem 0; }
+        .timing { display: inline-block; font-size: 0.85rem; font-weight: 600; color: #660099;
+          background: #E7E1F0; border-radius: 4px; padding: 0.1rem 0.5rem; margin-bottom: 0.75rem; }
+        a { color: #660099; }
+        </style>
+execute:
+  warning: false
+  message: false
+knitr:
+  opts_chunk:
+    fig.align: center
+    dpi: 96
+---
+
+This document collects every practical from the workshop in one place, with all code run and all outputs shown. Data are downloaded live from the police.uk, ONS Open Geography Portal and nomis APIs, as in the workshop. Exercises are shown with their solutions filled in.
+
+# Practical 0: R warm-up
+
+*10 min. Skip if you use R.*
+
+::: {.main-message}
+Code is a written record of every decision you make with your data.
+:::
+
+## Run code
+
+```{r}
+2 + 2
+sqrt(144)
+```
+
+- `sqrt()` is a **function**. Inputs go in brackets.
+
+## Objects
+
+```{r}
+n_crimes <- 1977
+n_wards <- 3
+n_crimes / n_wards
+```
+
+- `<-` stores a result in an **object**.
+
+## Data frames
+
+- Read data straight from the web. Here: crimes recorded within a mile of Leeds Town Hall in August 2026, from the police.uk API (more on APIs in Part 1).
+
+```{r}
+library(jsonlite)
+library(dplyr)
+
+crimes <- fromJSON("https://data.police.uk/api/crimes-street/all-crime?lat=53.7999&lng=-1.5492&date=2026-08") |>
+  flatten()
+
+nrow(crimes)
+head(crimes$category)
+table(crimes$category)
+```
+
+- Rows = crimes. Columns = variables.
+- `$` picks one column.
+
+## The pipe `|>` ("and then")
+
+```{r}
+crimes |>
+  filter(category == "robbery") |>
+  count(location.street.name, sort = TRUE)
+```
+
+- `filter()` keeps rows. `count()` tallies them.
+- "On or near Nightclub" is not a street. Hold that thought until Part 1.
+- `==` compares. A single `=` doesn't.
+- You will also see `%>%` in older code, books and the module. Same idea. `%>%` comes from the `magrittr` package (loaded with `dplyr`). `|>` has been built into R since version 4.1 (2021), so it needs no package. We use `|>`.
+
+## Your turn
+
+Which streets recorded the most **violent crime**?
+
+```{r}
+#| include: false
+library(dplyr); library(jsonlite)
+crimes <- flatten(fromJSON("https://data.police.uk/api/crimes-street/all-crime?lat=53.7999&lng=-1.5492&date=2026-08"))
+crimes$street_name <- crimes$location.street.name
+```
+
+```{r}
+crimes |>
+  filter(category == "violent-crime") |>
+  count(street_name, sort = TRUE)
+```
+
+::: {.hint exercise="warmup_1"}
+The category is `"violent-crime"` (lower case, with a hyphen). Count by `street_name`.
+:::
+
+::: {.solution exercise="warmup_1"}
+```r
+crimes |>
+  filter(category == "violent-crime") |>
+  count(street_name, sort = TRUE)
+```
+:::
+
+## Errors are normal
+
+```{r}
+#| error: true
+crimes |> filter(category == "Burglary") |> nrow()
+Crimes |> nrow()
+```
+
+- Line 1: 0 rows. R is case sensitive: the category is `burglary`.
+- Line 2: error. There's no `Crimes`, only `crimes`.
+- Read the error. Search it online.
+
+
+# Part 1: What is spatial data?
+
+*Points, lines, polygons, and what we mean by 'place'*
+
+::: {.main-message}
+"Criminologists have long been interested in the variability of crime at place, but they have given little thought to the level of geography that should be used in exploring such relationships." Weisburd, Bruinsma & Bernasco (2009: 4)
+:::
+
+In this session we take some  crime data for Leeds and work out how we can put it on the map. Along the way we meet the three building blocks of vector spatial data (**points**, **lines** and **polygons**), we get our data straight from the source (**police.uk** and the **ONS**), and we spend some time on a key question: when we say crime happens in a *place*, how do we go about defining this "place"?
+
+Run the blocks in order, from the top. Each one builds on the one before.
+
+## Getting started
+
+These are the packages we use in this session:
+
+- `sf` for spatial data ("simple features")
+- `dplyr` and `tidyr` for data wrangling
+- `ggplot2` for making maps
+- `jsonlite` for reading data from an API
+
+```{r}
+library(sf)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(jsonlite)
+```
+
+## Place, attributes and objects
+
+Geospatial analysis is about *what happens where*. Three ideas help us talk about it:
+
+- **Place**: where something is. People talk about places by name ("Hyde Park", "the city centre"), but to analyse them we need to operationalise these places.
+- **Attributes**: the things we record about a place, such as the type of crime, the number of burglaries, or the population. These live in an ordinary table: rows are observations, columns are variables.
+- **Objects**: how we represent places in a computer. In the *vector* model there are three kinds:
+    - **points**: a pair of coordinates (a crime, a pub, a bus stop)
+    - **lines**: an ordered sequence of points joined up (a street, a river, a bus route)
+    - **polygons**: a closed ring of points (a neighbourhood, a ward, a police beat)
+
+The alternative is the *raster* model, a grid of cells each holding a value. In crime mapping, kernel density estimation visuals use raster data for example. We do not use this today. 
+
+We will get some crime data for Leeds.
+
+## Crime from the police.uk API
+
+### What is an API?
+
+Police recorded crime for England, Wales and Northern Ireland is published every month at [data.police.uk](https://data.police.uk/). You can download it as spreadsheets, but you can also ask for it through an **API** (application programming interface). An API is a web address that returns data instead of a web page. You write the question into the address, and the data come back.
+
+Let's build a question. The police.uk [API documentation](https://data.police.uk/docs/method/crime-street/) tells us that to get street-level crimes within one mile of a location we need:
+
+| Part | Our value | What it means |
+|---|---|---|
+| `https://data.police.uk/api/` | | the address of the API |
+| `crimes-street/all-crime` | | the method: street-level crimes, all types |
+| `lat=` | `53.7999` | latitude of Leeds Town Hall |
+| `lng=` | `-1.5492` | longitude of Leeds Town Hall |
+| `date=` | `2026-08` | the month we want (August 2026) |
+
+Put together (the `?` starts the question, and `&` separates its parts):
+
+```{r}
+api_url <- "https://data.police.uk/api/crimes-street/all-crime?lat=53.7999&lng=-1.5492&date=2026-08"
+crimes_raw <- fromJSON(api_url)
+nrow(crimes_raw)
+```
+
+Each row is one crime recorded within a mile of the Town Hall in August 2026.
+
+::: {.callout-note collapse="true"}
+## API not responding?
+APIs occasionally go down, or slow down if a whole room uses them at once. If a block hangs or errors, use our saved copy instead:
+
+```r
+data_url <- "https://raw.githubusercontent.com/maczokni/crime_mapping_workshop/main/data/"
+crimes_raw <- read.csv(paste0(data_url, "backup/crimes_townhall_2026-08.csv"))
+```
+
+The backup is already flattened, so skip the `flatten()` step below.
+:::
+
+### Tidying the data
+
+The data arrive in **JSON** format, which allows tables inside tables. Look at the column names:
+
+```{r}
+names(crimes_raw)
+head(crimes_raw$location)
+```
+
+The `location` column is itself a small table, with latitude, longitude and a `street`. The `flatten()` function turns these nested tables into ordinary columns:
+
+```{r}
+crimes_flat <- flatten(crimes_raw)
+names(crimes_flat)
+```
+
+Now we keep only the columns we need and give them friendlier names. Notice one more thing: the API sends the coordinates as *text*, so we convert them to numbers with `as.numeric()`:
+
+```{r}
+crimes <- crimes_flat |>
+  transmute(id,
+            category,
+            month,
+            longitude = as.numeric(location.longitude),
+            latitude = as.numeric(location.latitude),
+            street_id = location.street.id,
+            street_name = location.street.name)
+
+head(crimes)
+crimes |> count(category, sort = TRUE)
+```
+
+### Where is the "where"?
+
+Have a look at the columns again. Which ones tell us *where* each crime happened? Have a think before reading on.
+
+There are two:
+
+- `longitude` and `latitude` locate each crime at a **point**.
+- `street_name` ("On or near ...") ties each crime to a street, which we can represent as a **line**.
+
+Polygons are missing. Unlike the monthly spreadsheets, the API does not tell us which neighbourhood each crime is in. We will work that out ourselves, using a spatial operation.
+
+### Making the points spatial
+
+Right now R just sees two columns of numbers. We use `st_as_sf()` to tell it these are coordinates, and which **coordinate reference system** (CRS) they belong to. Longitude and latitude are in **WGS 84**, whose code (EPSG number) is **4326**:
+
+```{r}
+crimes_sf <- st_as_sf(crimes,
+                      coords = c("longitude", "latitude"),  # which columns hold x and y
+                      crs = 4326)                           # WGS 84
+crimes_sf
+```
+
+The two coordinate columns have been replaced by a single `geometry` column, and the header now tells us the geometry type (`POINT`), the bounding box, and the CRS. It is still a data frame, but now it is also a *simple features* object.
+
+To map it, we use `ggplot()` with `geom_sf()`. The geometry column tells `ggplot` where to draw each point:
+
+```{r}
+ggplot() +
+  geom_sf(data = crimes_sf, alpha = 0.4)
+```
+
+### How precise are these points?
+
+Look closely and you will notice that many points sit exactly on top of each other. Let's check how many distinct locations there are:
+
+```{r}
+nrow(crimes)
+n_distinct(crimes$street_id)
+```
+
+There are far fewer locations than crimes. To protect victims' privacy, police.uk **snaps every crime to the nearest of a fixed set of anonymous map points**, each with a description like "On or near Briggate". Some of these are not streets at all:
+
+```{r}
+crimes |> count(street_name, sort = TRUE) |> head(10)
+```
+
+So our "points" are not where crimes happened. They are where crimes were *put* for publication. That matters a lot once we analyse patterns at fine scales, as we will in the afternoon. (If you are interested, Tompson et al., 2015 (see readings in where next), tested how reliable these data are at different units of analysis)
+
+::: {.callout-important}
+## Think
+How many crimes sit at each snap point? Pick one of the top locations above. What sort of place is it? Is it plausible that so many crimes really happened at exactly that spot?
+:::
+
+## Polygons: boundaries from the ONS
+
+### Where do boundaries come from?
+
+To say anything about neighbourhoods, we need their shapes. In the UK, official boundaries are published by the Office for National Statistics on the [Open Geography Portal](https://geoportal.statistics.gov.uk/). You can browse and download them by hand:
+
+1. Go to the [Open Geography Portal](https://geoportal.statistics.gov.uk/) and open **Boundaries** in the menu.
+2. Choose the type, for example **Census Boundaries → Lower Layer Super Output Areas → 2021 Boundaries**.
+3. Pick a version. The letters tell you how detailed it is:
+    - **BFC**: full resolution, clipped to the coastline
+    - **BFE**: full resolution, extending into the sea
+    - **BGC**: generalised (simplified to about 20 m), clipped
+    - **BSC**: super generalised (about 200 m), clipped
+4. Download as a **Shapefile** or **GeoJSON**.
+
+A shapefile is really several files that must stay together in the same folder: `.shp` (the shapes), `.shx` (an index), `.dbf` (the attribute table) and `.prj` (the coordinate reference system). GeoJSON is a single text file, which is often easier to manage.
+
+The same data can also be requested through an API, just like the crime data. That is what we will do, so you can see exactly what we asked for.
+
+### Wards for Leeds
+
+Wards are administrative areas used for local elections. Let's ask the portal for all the May 2026 wards in Leeds (generalised, clipped: BGC), in WGS 84, as GeoJSON:
+
+```{r}
+ons <- "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/"
+
+ward_url <- paste0(ons,
+  "WD_MAY_2026_UK_BGC/FeatureServer/0/query",  # which dataset
+  "?where=", URLencode("LAD26NM='Leeds'", reserved = TRUE),       # which rows: wards in Leeds
+  "&outFields=WD26CD,WD26NM",                                       # which columns
+  "&outSR=4326",                                                    # which CRS (WGS 84)
+  "&f=geojson")                                                     # which format
+
+download.file(ward_url, "leeds_wards.geojson")
+leeds_wards <- st_read("leeds_wards.geojson")
+```
+
+`download.file()` saves the result as a file, and `st_read()` reads any spatial file format (shapefile, GeoJSON, GeoPackage and more) into R. Let's look:
+
+```{r}
+nrow(leeds_wards)
+
+ggplot(leeds_wards) +
+  geom_sf() +
+  geom_sf_text(aes(label = WD26NM), size = 2) +
+  theme_void()
+```
+
+Notice what a polygon is: an ordered ring of coordinates that starts and ends at the same point. Here is the start of the first ward's ring:
+
+```{r}
+head(st_coordinates(leeds_wards[1, ]))
+```
+
+### Our study area
+
+We will focus on three wards: **Little London & Woodhouse** and **Hunslet & Riverside**, which between them cover the city centre and the university, and **Headingley & Hyde Park**, a largely student area to the north west. `st_union()` dissolves them into a single polygon:
+
+```{r}
+study_wards <- leeds_wards |>
+  filter(WD26NM %in% c("Little London & Woodhouse", "Hunslet & Riverside", "Headingley & Hyde Park"))
+
+study_area <- st_union(study_wards)
+
+ggplot() +
+  geom_sf(data = leeds_wards, fill = "grey95", colour = "grey70") +
+  geom_sf(data = study_area, fill = "#5b2a86", alpha = 0.5) +
+  theme_void()
+```
+
+### Lower Layer Super Output Areas
+
+**LSOAs** are census areas, built for statistics rather than for politics or policing. Each has roughly 1,500 residents, and they nest neatly inside larger census areas: Output Areas (OAs) form LSOAs, LSOAs form Middle Layer Super Output Areas (MSOAs), and MSOAs form local authorities. Every LSOA in Leeds has a name starting with "Leeds", so we ask for `LSOA21NM LIKE 'Leeds%'`:
+
+```{r}
+lsoa_url <- paste0(ons,
+  "Lower_layer_Super_Output_Areas_December_2021_Boundaries_EW_BGC_V5/FeatureServer/0/query",
+  "?where=", URLencode("LSOA21NM LIKE 'Leeds%'", reserved = TRUE),
+  "&outFields=LSOA21CD,LSOA21NM&outSR=4326&f=geojson")
+
+download.file(lsoa_url, "leeds_lsoa.geojson")
+leeds_lsoa <- st_read("leeds_lsoa.geojson", quiet = TRUE)
+nrow(leeds_lsoa)
+```
+
+We keep only the LSOAs in our study area. But LSOAs do **not** nest inside wards: the two were drawn separately, so some ward boundaries cut straight through LSOAs. Whatever we do, the edge will be ragged. We ask: whose *centre* falls inside our study area? `st_point_on_surface()` gives a point guaranteed to lie inside each polygon, and `st_intersects()` tells us which of those points are in the study area. This keeps the LSOAs that are mostly inside. Using the whole shape instead would pick up every LSOA that merely touches the edge: 78 instead of 43, covering more than twice the area of our three wards.
+
+```{r}
+lsoa_centres <- st_point_on_surface(st_geometry(leeds_lsoa))
+inside <- lengths(st_intersects(lsoa_centres, study_area)) > 0
+
+study_lsoa <- leeds_lsoa[inside, ]
+nrow(study_lsoa)
+```
+
+You will see a warning that this "may not give correct results for longitude/latitude data". `sf` is reminding us that we are still working in degrees on a round Earth. It doesn't matter for picking LSOAs, and we will switch to metres shortly.
+
+```{r}
+ggplot() +
+  geom_sf(data = study_lsoa, fill = "#f1eaf8", colour = "#5b2a86") +
+  geom_sf(data = study_wards, fill = NA, colour = "black", linewidth = 1) +
+  theme_void()
+```
+
+Each ward is made up of a dozen or more LSOAs.
+
+### A third kind of neighbourhood: the police's
+
+Police forces have their own geography. West Yorkshire Police organise neighbourhood policing into neighbourhood areas, and the police.uk API will give us the boundary of each one. "Leeds City" has the id `LDT_CITY`:
+
+```{r}
+nbhd_points <- fromJSON("https://data.police.uk/api/west-yorkshire/LDT_CITY/boundary")
+head(nbhd_points)
+nrow(nbhd_points)
+```
+
+This is not a spatial object yet. It is just a list of corners, as text. To turn it into a polygon, we do by hand what `st_read()` did for us earlier: make the coordinates numeric, put them in order (longitude first), close the ring, and declare the CRS:
+
+```{r}
+corners <- cbind(as.numeric(nbhd_points$longitude),
+                 as.numeric(nbhd_points$latitude))
+corners <- rbind(corners, corners[1, ])   # a polygon ring must end where it starts
+
+police_nbhd <- st_sfc(st_polygon(list(corners)), crs = 4326)
+
+ggplot() +
+  geom_sf(data = leeds_wards, fill = "grey95", colour = "grey70") +
+  geom_sf(data = police_nbhd, fill = NA, colour = "#d7301f", linewidth = 1) +
+  geom_sf(data = study_area, fill = NA, colour = "#5b2a86", linewidth = 1) +
+  theme_void()
+```
+
+The red outline is the police's "Leeds City" neighbourhood. The purple outline is our study area made of wards. They overlap, but they are not the same thing.
+
+### Crimes for the study area
+
+Our first API question asked for a circle with a 1-mile radius around the Town Hall. That circle is not a meaningful place. It is simply how the API works. The API can also take a polygon, written as a list of `latitude,longitude` corners separated by colons. The simplest polygon that covers our study area is its **bounding box**, the smallest rectangle around it:
+
+```{r}
+bb <- st_bbox(study_area)
+bb
+
+poly <- paste0(bb["ymin"], ",", bb["xmin"], ":",
+               bb["ymin"], ",", bb["xmax"], ":",
+               bb["ymax"], ",", bb["xmax"], ":",
+               bb["ymax"], ",", bb["xmin"])
+
+study_url <- paste0("https://data.police.uk/api/crimes-street/all-crime?poly=", poly, "&date=2026-08")
+
+crimes_box <- fromJSON(study_url) |>
+  flatten() |>
+  transmute(id, category, month,
+            longitude = as.numeric(location.longitude),
+            latitude = as.numeric(location.latitude),
+            street_id = location.street.id,
+            street_name = location.street.name) |>
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+
+nrow(crimes_box)
+```
+
+The rectangle includes crimes outside our three wards, so we clip it with another spatial filter:
+
+```{r}
+study_crimes <- st_filter(crimes_box, study_area)
+nrow(study_crimes)
+
+ggplot() +
+  geom_sf(data = study_area, fill = "grey95") +
+  geom_sf(data = crimes_box, colour = "grey70", size = 0.5) +
+  geom_sf(data = study_crimes, colour = "#5b2a86", size = 0.5) +
+  theme_void()
+```
+
+::: {.callout-note collapse="true"}
+## API not responding?
+```r
+data_url <- "https://raw.githubusercontent.com/maczokni/crime_mapping_workshop/main/data/"
+crimes_box <- read.csv(paste0(data_url, "backup/crimes_2026-08.csv")) |>
+  transmute(id, category, month, longitude = location.longitude, latitude = location.latitude,
+            street_id = location.street.id, street_name = location.street.name) |>
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+```
+:::
+
+### Matching coordinate reference systems
+
+So far everything has been in WGS 84, in degrees. For anything involving distances or areas we want a projected CRS in **metres**. In Great Britain that is the **British National Grid** (EPSG **27700**). `st_transform()` converts between them:
+
+```{r}
+study_crimes <- st_transform(study_crimes, 27700)
+study_area   <- st_transform(study_area, 27700)
+study_lsoa   <- st_transform(study_lsoa, 27700)
+study_wards  <- st_transform(study_wards, 27700)
+police_nbhd  <- st_transform(police_nbhd, 27700)
+
+st_coordinates(study_crimes)[1, ]   # now in metres east and north
+```
+
+Layers combined in a spatial operation must share a CRS. If they don't, `sf` will stop you with an error, which is exactly what you want.
+
+## Lines: streets
+
+### Getting street data
+
+Crime data refer to streets ("On or near Briggate"), but they don't tell us what the street looks like. For that we need line data. A good open source is [OpenStreetMap](https://www.openstreetmap.org/), a map of the world drawn by volunteers. We have extracted the streets in our study area and saved them on GitHub, as a CSV file with the shape of each street stored as text:
+
+```{r}
+data_url <- "https://raw.githubusercontent.com/maczokni/crime_mapping_workshop/main/data/"
+
+streets <- read.csv(paste0(data_url, "leeds_streets.csv")) |>
+  st_as_sf(wkt = "geometry", crs = 27700)
+
+head(streets)
+```
+
+The shapes are written in a format called **WKT** (well-known text). Have a look at one:
+
+```{r}
+st_as_text(streets$geometry[1])
+```
+
+A `LINESTRING` is exactly what we said a line is: an ordered sequence of coordinate pairs, joined up in order.
+
+::: {.callout-note collapse="true"}
+## How we got these streets (and how you could)
+In RStudio, the `osmextract` package downloads OpenStreetMap data for a region and reads it with `sf`:
+
+```r
+library(osmextract)
+streets <- oe_get("West Yorkshire", layer = "lines", boundary = study_area, boundary_type = "clipsrc")
+```
+
+The full script is in `data-raw/get_data.R` in this site's repository.
+:::
+
+### Streets and crimes together
+
+```{r}
+ggplot() +
+  geom_sf(data = study_area, fill = "grey97", colour = NA) +
+  geom_sf(data = streets, colour = "grey60", linewidth = 0.2) +
+  geom_sf(data = study_crimes, colour = "#5b2a86", size = 0.4, alpha = 0.5) +
+  theme_void()
+```
+
+Let's take one street as an example. Duncan Street is a short, busy street in the city centre, running from the Corn Exchange to Briggate:
+
+```{r}
+duncan <- streets |> filter(name == "Duncan Street")
+duncan_crimes <- study_crimes |> filter(street_name == "On or near Duncan Street")
+nrow(duncan_crimes)
+nrow(distinct(duncan_crimes, geometry))   # how many distinct points?
+
+ggplot() +
+  geom_sf(data = st_crop(st_geometry(streets), st_buffer(duncan, 300)), colour = "grey70") +
+  geom_sf(data = duncan, colour = "black", linewidth = 1.5) +
+  geom_sf(data = duncan_crimes, colour = "#d7301f", size = 3, alpha = 0.3) +
+  theme_void()
+```
+
+In August 2026, over a hundred crimes were recorded "on or near Duncan Street", and every one of them sits on the same single point. Snap points, not true locations.
+
+### Street segments as a unit of analysis
+
+Much research in the criminology of place uses the **street segment**, both sides of a street between two intersections, as its unit of analysis (Weisburd et al., 2012). The argument is that a street segment is a small social world, a *behaviour setting*, where people see each other regularly and develop shared routines and norms.
+
+The police.uk street names are not quite segments. To count crimes on our street lines, we can attach each crime to the **nearest** street line:
+
+```{r}
+nearest <- st_nearest_feature(study_crimes, streets)   # row number of the nearest street, for each crime
+streets$crimes <- tabulate(nearest, nbins = nrow(streets))
+
+summary(streets$crimes)
+mean(streets$crimes == 0)    # share of street lines with no crime at all
+```
+
+```{r}
+ggplot() +
+  geom_sf(data = streets, colour = "grey85", linewidth = 0.2) +
+  geom_sf(data = filter(streets, crimes > 0) |> arrange(crimes),
+          aes(colour = crimes, linewidth = crimes)) +
+  scale_colour_viridis_c(option = "magma", direction = -1, trans = "sqrt") +
+  scale_linewidth(range = c(0.3, 2), guide = "none") +
+  theme_void()
+```
+
+Most streets have no recorded crime at all, and a handful have a lot.
+
+::: {.callout-note collapse="true"}
+## A caveat about OpenStreetMap "streets"
+OpenStreetMap stores roads as *ways*, which don't always run from one junction to the next: a long road may be one way, or a short stretch may be split into several. Real street-segment studies first split the network at every junction. The `sfnetworks` package can do this.
+:::
+
+## So what is a neighbourhood?
+
+We now have crime counted at several different units: snap points, street lines, LSOAs (once we join them), wards and the police's neighbourhood. Which is "the" neighbourhood?
+
+There is no agreed answer. Neighbourhood is famously hard to pin down: Galster (2001: 2111) wrote that it "is hard to define precisely, but everyone knows it when they see it". Bannister et al. (2019) call this unsatisfactory, and say the usual alternative is too: falling back on administrative boundaries such as LSOAs and wards. These are convenient, because they are stable and come with lots of census data. But they were drawn for counting people or running elections, not to capture where residents feel their neighbourhood begins and ends. Do you know which LSOA you live in? Most people don't.
+
+Let's see what our choice of unit does. To count crimes per LSOA we need to know which LSOA each crime falls in. The API didn't tell us, so we do a **spatial join**: `st_join()` adds to each crime the columns of the polygon it falls inside.
+
+```{r}
+crimes_with_lsoa <- st_join(study_crimes, study_lsoa)
+head(crimes_with_lsoa)
+```
+
+Now we can count per LSOA, and join the counts back onto the LSOA polygons:
+
+```{r}
+lsoa_counts <- crimes_with_lsoa |>
+  st_drop_geometry() |>
+  count(LSOA21CD, name = "crimes")
+
+lsoa_crimes <- study_lsoa |>
+  left_join(lsoa_counts, by = "LSOA21CD") |>
+  mutate(crimes = replace_na(crimes, 0))   # LSOAs with no crimes get 0 rather than NA
+
+head(lsoa_crimes)
+```
+
+And the same for wards, this time in one go. `lengths(st_intersects(polygons, points))` counts the points inside each polygon:
+
+```{r}
+study_wards$crimes <- lengths(st_intersects(study_wards, study_crimes))
+st_drop_geometry(study_wards)
+```
+
+Now compare the same crimes, mapped at three units:
+
+```{r}
+#| fig-height: 4
+ggplot() +
+  geom_sf(data = lsoa_crimes, aes(fill = crimes), colour = "white", linewidth = 0.1) +
+  scale_fill_viridis_c(option = "magma", direction = -1) +
+  labs(title = "Crimes per LSOA") +
+  theme_void()
+
+ggplot() +
+  geom_sf(data = study_wards, aes(fill = crimes), colour = "white") +
+  scale_fill_viridis_c(option = "magma", direction = -1) +
+  labs(title = "Crimes per ward") +
+  theme_void()
+```
+
+At ward level, the city centre swallows everything around it. At LSOA level, a few small areas stand out. At street level (the map above), it is a few streets within those areas. This is the **modifiable areal unit problem** (MAUP) in action: the pattern you see depends on the units you count in. You can't make it go away, but you can choose your unit deliberately and say why.
+
+::: {.callout-important}
+## Think
+If you were studying violence in the night time economy, which unit would you choose: snap point, street segment, LSOA, ward or police neighbourhood? What if you were studying the effect of poverty on burglary? Why might the answer differ?
+:::
+
+## Your turn
+
+### 1. A different crime, a different month
+
+The API can return a single crime type by replacing `all-crime` with its category, and any month from the last three years. Fill in the blanks to get **burglaries** in **July 2026**, then map them over the LSOAs.
+
+```{r}
+#| include: false
+library(sf); library(dplyr); library(ggplot2); library(jsonlite)
+ons <- "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/"
+lsoa_url <- paste0(ons, "Lower_layer_Super_Output_Areas_December_2021_Boundaries_EW_BGC_V5/FeatureServer/0/query",
+  "?where=", URLencode("LSOA21NM LIKE 'Leeds%'", reserved = TRUE), "&outFields=LSOA21CD,LSOA21NM&outSR=4326&f=geojson")
+download.file(lsoa_url, "leeds_lsoa_ex.geojson", quiet = TRUE)
+leeds_lsoa <- st_read("leeds_lsoa_ex.geojson", quiet = TRUE)
+poly <- "53.7555,-1.5905:53.7555,-1.4820:53.8242,-1.4820:53.8242,-1.5905"
+```
+
+```{r}
+my_url <- paste0("https://data.police.uk/api/crimes-street/", "burglary",
+                 "?poly=", poly, "&date=", "2026-07")
+
+my_crimes <- fromJSON(my_url) |>
+  flatten() |>
+  transmute(longitude = as.numeric(location.longitude),
+            latitude = as.numeric(location.latitude)) |>
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326)
+
+nrow(my_crimes)
+
+ggplot() +
+  geom_sf(data = st_filter(leeds_lsoa, my_crimes), fill = "white") +
+  geom_sf(data = my_crimes, colour = "#d7301f") +
+  theme_void()
+```
+
+::: {.callout-tip collapse="true"}
+## Already know R? Stretch yourself
+1. Census **Output Areas** are smaller still (about 300 residents). Request them from the portal (`Output_Areas_2021_EW_BGC_V2`, field `OA21CD`; look up the service name in the [portal's API list](https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services)) and map crimes per OA.
+2. Explore the `sfnetworks` package [https://luukvdmeer.github.io/sfnetworks/](https://luukvdmeer.github.io/sfnetworks/). You can try using it to split the streets at junctions (`to_spatial_subdivision`) before counting crimes per segment above. 
+3. The police.uk API also has stop and search data: `https://data.police.uk/api/stops-street?poly=...&date=2026-08`. Map it alongside crime or look at area-level correlations.
+:::
+
+
+# Part 2: Making maps
+
+*Cartography: layers, map elements, rates, classification and colour*
+
+::: {.main-message}
+"...what is also known by some cartographers is the capacity of poorly designed maps to be erroneous and misleading." Ratcliffe (2010: 17)
+:::
+
+In Part 1 we got our data onto a map. Now we think about how to make *good* maps. Historically, maps have been the main way to store and communicate spatial information, and the human eye is quick to spot patterns in a well-designed one. It is just as quick to spot patterns in a badly designed one, which is why the choices we make matter.
+
+We distinguish two kinds of map:
+
+- **Reference maps** show where things are: streets, rivers, boundaries, landmarks. You use them to find your way.
+- **Thematic maps** show how something varies across space: crimes, rates, populations. This is what we make in crime mapping, usually placed on top of some reference information so readers can orient themselves.
+
+## Getting started
+
+This block repeats the steps from Part 1 in one go: it downloads the wards and LSOAs, gets the August 2026 crimes for our study area, and reads the streets. Run it and read through it to remind yourself what each step does.
+
+```{r}
+library(sf); library(dplyr); library(ggplot2); library(jsonlite)
+library(classInt); library(ggspatial); library(RColorBrewer)
+
+ons <- "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/"
+data_url <- "https://raw.githubusercontent.com/maczokni/crime_mapping_workshop/main/data/"
+
+# wards in Leeds, and our three-ward study area
+download.file(paste0(ons, "WD_MAY_2026_UK_BGC/FeatureServer/0/query?where=",
+                     URLencode("LAD26NM='Leeds'", reserved = TRUE),
+                     "&outFields=WD26CD,WD26NM&outSR=4326&f=geojson"), "leeds_wards.geojson", quiet = TRUE)
+study_wards <- st_read("leeds_wards.geojson", quiet = TRUE) |>
+  filter(WD26NM %in% c("Little London & Woodhouse", "Hunslet & Riverside", "Headingley & Hyde Park"))
+study_area <- st_union(study_wards)
+
+# LSOAs whose centre is in the study area
+download.file(paste0(ons, "Lower_layer_Super_Output_Areas_December_2021_Boundaries_EW_BGC_V5/FeatureServer/0/query?where=",
+                     URLencode("LSOA21NM LIKE 'Leeds%'", reserved = TRUE),
+                     "&outFields=LSOA21CD,LSOA21NM&outSR=4326&f=geojson"), "leeds_lsoa.geojson", quiet = TRUE)
+leeds_lsoa <- st_read("leeds_lsoa.geojson", quiet = TRUE)
+study_lsoa <- leeds_lsoa[lengths(st_intersects(suppressWarnings(st_point_on_surface(st_geometry(leeds_lsoa))), study_area)) > 0, ]
+
+# crimes in the study area's bounding box, clipped to the study area
+bb <- st_bbox(study_area)
+poly <- paste0(bb["ymin"], ",", bb["xmin"], ":", bb["ymin"], ",", bb["xmax"], ":",
+               bb["ymax"], ",", bb["xmax"], ":", bb["ymax"], ",", bb["xmin"])
+study_crimes <- fromJSON(paste0("https://data.police.uk/api/crimes-street/all-crime?poly=", poly, "&date=2026-08")) |>
+  flatten() |>
+  transmute(id, category, longitude = as.numeric(location.longitude), latitude = as.numeric(location.latitude)) |>
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) |>
+  st_filter(study_area)
+
+# everything into British National Grid (metres)
+study_crimes <- st_transform(study_crimes, 27700)
+study_area   <- st_transform(study_area, 27700)
+study_wards  <- st_transform(study_wards, 27700)
+study_lsoa   <- st_transform(study_lsoa, 27700)
+
+# streets from OpenStreetMap
+streets <- read.csv(paste0(data_url, "leeds_streets.csv")) |> st_as_sf(wkt = "geometry", crs = 27700)
+
+nrow(study_crimes); nrow(study_lsoa)
+```
+
+## Building a map in layers
+
+`ggplot2` builds every graphic from the same few pieces: data, geometries (the marks that get drawn) and aesthetics (how data map onto position, colour and size). Maps work the same way, as a stack of layers. The order matters: each layer is drawn on top of the ones before.
+
+Let's build a map of violent crime, one layer at a time. First, only the data:
+
+```{r}
+violence <- study_crimes |> filter(category == "violent-crime")
+
+ggplot() +
+  geom_sf(data = violence)
+```
+
+The points float in a grey box with axes of latitude and longitude. Would you call this a map? There is nothing to tell us where we are. Let's add some reference layers underneath: the study area as a background, then the streets, then the ward boundaries, then our crimes on top:
+
+```{r}
+ggplot() +
+  geom_sf(data = study_area, fill = "grey97", colour = NA) +                    # 1. background
+  geom_sf(data = streets, colour = "grey75", linewidth = 0.2) +                 # 2. streets
+  geom_sf(data = study_wards, fill = NA, colour = "grey40", linewidth = 0.5) +  # 3. ward outlines
+  geom_sf(data = violence, colour = "#d7301f", size = 0.8, alpha = 0.5) +       # 4. the data
+  theme_void()
+```
+
+Notice the **visual hierarchy**. The reference layers are pale and thin, and the data are bold and coloured, so the eye goes to the data first. `alpha` makes the points partly transparent, so places where many points overlap look darker.
+
+::: {.callout-note collapse="true"}
+## Basemaps
+In RStudio you can add a full street basemap from OpenStreetMap with `annotation_map_tile()` from the `ggspatial` package, as in the module. Map tiles don't download in the browser version of R, so here we draw our own reference layers instead. That is often better anyway, because you control exactly what the reader sees.
+:::
+
+## Map elements
+
+A map that will be read by someone else needs a few more things:
+
+- a **title** (and often a subtitle) saying what, where and when
+- a **legend** that explains the symbols, with a meaningful title
+- a **scale bar**, so readers can judge distances
+- a **north arrow**, if north is not obviously up
+- a **source line** crediting the data. Our data are published under the Open Government Licence, which *requires* attribution.
+
+```{r}
+ggplot() +
+  geom_sf(data = study_area, fill = "grey97", colour = NA) +
+  geom_sf(data = streets, colour = "grey75", linewidth = 0.2) +
+  geom_sf(data = study_wards, fill = NA, colour = "grey40", linewidth = 0.5) +
+  geom_sf(data = violence, aes(colour = "Violence and sexual offences"), size = 0.8, alpha = 0.5) +
+  scale_colour_manual(values = "#d7301f", name = NULL) +
+  annotation_scale(location = "bl") +                                   # scale bar, bottom left
+  annotation_north_arrow(location = "tr", height = unit(1, "cm"),
+                         width = unit(1, "cm")) +                       # north arrow, top right
+  labs(title = "Recorded violence, central Leeds",
+       subtitle = "August 2026. Each point is a police.uk anonymised location.",
+       caption = "Crime: police.uk. Boundaries: ONS (Contains OS data © Crown copyright).\nStreets: © OpenStreetMap contributors. Open Government Licence v3.0.") +
+  theme_void() +
+  theme(legend.position = "bottom")
+```
+
+::: {.callout-important}
+## Think
+Point maps work well when there are few points. With thousands of crimes, points pile up and the map mostly shows where *people* are. What else could we do? 
+:::
+
+## From points to areas: choropleth maps
+
+A **choropleth** map shades areas by a value. First, count crimes per LSOA, using the spatial join from Part 1 in one line:
+
+```{r}
+study_lsoa$crimes <- lengths(st_intersects(study_lsoa, study_crimes))
+
+ggplot(study_lsoa) +
+  geom_sf(aes(fill = crimes), colour = "white", linewidth = 0.1) +
+  scale_fill_distiller(palette = "Reds", direction = 1, name = "Crimes") +
+  theme_void()
+```
+
+A handful of city-centre LSOAs dominate. But is that because they are dangerous, or because lots of people pass through them?
+
+## Counts or rates?
+
+A count map mostly shows where the people and the opportunities are: more people, more crime. To compare places fairly, we divide by a measure of the **population at risk** to get a **rate**.
+
+### Getting population data from nomis
+
+The UK Census is published through [nomis](https://www.nomisweb.co.uk/). Like police.uk and the ONS portal, nomis has an API. We want table **TS001** (usual residents, Census 2021), which nomis calls dataset `NM_2021_1`, for every LSOA in Leeds:
+
+| Part | Value | Meaning |
+|---|---|---|
+| dataset | `NM_2021_1` | TS001, number of usual residents |
+| `geography=` | `E08000035TYPE151` | every LSOA (`TYPE151`) in Leeds (`E08000035`) |
+| `c2021_restype_3=` | `0` | all residents (households and communal establishments) |
+| `measures=` | `20100` | the count itself |
+| `select=` | `geography_code,obs_value` | which columns we want |
+
+```{r}
+pop_url <- paste0("https://www.nomisweb.co.uk/api/v01/dataset/NM_2021_1.data.csv?date=latest",
+                  "&geography=E08000035TYPE151&c2021_restype_3=0&measures=20100",
+                  "&select=geography_code,obs_value")
+population <- read.csv(pop_url)
+head(population)
+nrow(population)
+```
+
+Now we join it to our LSOAs by the shared code, and compute crimes per 1,000 residents:
+
+```{r}
+study_lsoa <- study_lsoa |>
+  select(-any_of(c("residents", "rate"))) |>   # so this block can safely be run twice
+  left_join(population, by = c("LSOA21CD" = "GEOGRAPHY_CODE")) |>
+  rename(residents = OBS_VALUE) |>
+  mutate(rate = crimes / residents * 1000)
+
+summary(study_lsoa$rate)
+```
+
+::: {.callout-note collapse="true"}
+## nomis not responding?
+```r
+population <- read.csv(paste0(data_url, "backup/leeds_lsoa_population.csv"))
+names(population) <- toupper(names(population))
+```
+:::
+
+```{r}
+ggplot(study_lsoa) +
+  geom_sf(aes(fill = rate), colour = "white", linewidth = 0.1) +
+  scale_fill_distiller(palette = "Reds", direction = 1, name = "Crimes per\n1,000 residents") +
+  theme_void()
+```
+
+The city centre still stands out, and even more strongly, because very few people *live* there. But most of the people there on a given day don't live there. The residential population is the wrong denominator for crime against shoppers and commuters. This is the **denominator dilemma**: the best denominator is the one that captures the opportunities for the crime you are mapping. Options include the workplace population (people who work in an area: Census 2021 table WP001, a bulk download from nomis rather than the API), estimates of ambient population (e.g. from mobile phone data), the number of homes (for burglary), or the number of cars (for vehicle crime).
+
+::: {.callout-important}
+## Think
+What would be the right denominator for shoplifting? For bicycle theft? For domestic burglary?
+:::
+
+## Classification: same data, different maps
+
+The maps above use a smooth colour gradient. Usually we group values into a handful of **classes**, each with its own colour. Where the class breaks go is a decision, and it can change the message completely. First, look at the distribution:
+
+```{r}
+ggplot(study_lsoa, aes(rate)) +
+  geom_histogram(bins = 30, fill = "grey60") +
+  labs(x = "Crimes per 1,000 residents", y = "Number of LSOAs") +
+  theme_minimal()
+```
+
+Very skewed: most LSOAs have low rates, and a few have very high ones. The common classification methods are:
+
+- **Equal interval**: divides the *range* into equal-width bands. Easy to read, but with skewed data nearly every area lands in the bottom class.
+- **Quantile**: puts the same *number of areas* in each class. Every class is used, but very different values can share a class.
+- **Natural breaks (Jenks)**: an algorithm that places breaks at natural gaps, minimising variation within each class.
+- **Standard deviation**: classes by distance from the mean. Best for roughly normal data.
+
+The `classInt` package computes the breaks. Here are the breaks each method chooses, drawn on the histogram:
+
+```{r}
+#| fig-height: 6
+methods <- c("equal", "quantile", "jenks", "sd")
+breaks <- lapply(methods, function(m) classIntervals(study_lsoa$rate, n = 5, style = m)$brks)
+names(breaks) <- methods
+
+lines_df <- data.frame(method = rep(methods, lengths(breaks)), brk = unlist(breaks))
+
+ggplot(study_lsoa, aes(rate)) +
+  geom_histogram(bins = 30, fill = "grey70") +
+  geom_vline(data = lines_df, aes(xintercept = brk), colour = "#d7301f") +
+  facet_wrap(~ method, ncol = 1) +
+  theme_minimal()
+```
+
+And the resulting maps:
+
+```{r}
+#| fig-width: 10
+#| fig-height: 4
+classed <- bind_rows(lapply(methods, function(m) {
+  study_lsoa |> mutate(method = m,
+                       class = as.integer(cut(rate, unique(breaks[[m]]), include.lowest = TRUE)))
+}))
+
+ggplot(classed) +
+  geom_sf(aes(fill = factor(class)), colour = "white", linewidth = 0.1) +
+  facet_wrap(~ method, nrow = 1) +
+  scale_fill_brewer(palette = "Reds", name = "Class\n(1 = lowest)") +
+  theme_void()
+```
+
+Same data, four maps. The equal interval map says almost everywhere is fine. The quantile map says half the area is a problem. Neither is wrong, but they invite different conclusions. Choose deliberately, and be explicit about what you chose and *why*.
+
+### Your turn: try other classifications
+
+`classIntervals()` has other styles: `"pretty"`, `"fisher"`, `"headtails"`, `"kmeans"`. Change the style, and the number of classes `n`, and look at where the breaks fall.
+
+```{r}
+#| include: false
+library(sf); library(dplyr); library(ggplot2); library(classInt)
+```
+
+```{r}
+my_breaks <- classIntervals(study_lsoa$rate, n = 5, style = "fisher")
+my_breaks
+
+study_lsoa |>
+  mutate(class = cut(rate, unique(my_breaks$brks), include.lowest = TRUE, dig.lab = 3)) |>
+  ggplot() +
+  geom_sf(aes(fill = class), colour = "white", linewidth = 0.1) +
+  scale_fill_brewer(palette = "Reds", name = "Crimes per\n1,000 residents") +
+  theme_void()
+```
+
+
+
+## Colour
+
+Colour schemes come in three families. Match the family to your data:
+
+- **Sequential** (light to dark): ordered data from low to high, like counts and rates.
+- **Diverging** (two colours meeting at a neutral midpoint): data with a meaningful middle, like above or below average.
+- **Qualitative** (distinct hues): categories with no order, like crime types.
+
+The ColorBrewer palettes, designed by the cartographer Cynthia Brewer, are built for maps. You can see them all:
+
+```{r}
+#| fig-height: 7
+display.brewer.all(colorblindFriendly = TRUE)
+```
+
+A diverging scheme suits a rate compared with the study area's average. Here, values above the average are red and values below it are blue:
+
+```{r}
+average_rate <- sum(study_lsoa$crimes) / sum(study_lsoa$residents) * 1000
+
+study_lsoa <- study_lsoa |>
+  mutate(relative = rate / average_rate,         # 1 = exactly average, 2 = twice the average
+         relative = pmin(pmax(relative, 1/8), 8)) # cap at 8 times above or below, so the scale stays readable
+
+ggplot(study_lsoa) +
+  geom_sf(aes(fill = relative), colour = "white", linewidth = 0.1) +
+  scale_fill_distiller(palette = "RdBu", trans = "log2", limits = c(1/8, 8),
+                       breaks = c(1/8, 1/4, 1/2, 1, 2, 4, 8),
+                       labels = c("1/8", "1/4", "1/2", "1", "2", "4", "8"),
+                       name = "Rate relative\nto study area") +
+  theme_void()
+```
+
+A few rules of thumb:
+
+- Around 1 in 12 men and 1 in 200 women have some form of colour vision deficiency. Use colour-blind-safe palettes (the viridis palettes are all safe).
+- Will it be printed in black and white? Check that the classes are still distinguishable.
+- Don't use a rainbow for ordered data: our eyes don't read hue as "more" or "less".
+
+### Your turn: pick a palette
+
+Change the palette below. Try `"YlGnBu"`, `"Purples"`, `"PuOr"` (diverging) or `"Set2"` (qualitative). Which ones suit these data, and which mislead?
+
+```{r}
+#| include: false
+library(sf); library(dplyr); library(ggplot2); library(classInt)
+```
+
+```{r}
+q_breaks <- classIntervals(study_lsoa$rate, n = 5, style = "quantile")$brks
+
+study_lsoa |>
+  mutate(class = cut(rate, unique(q_breaks), include.lowest = TRUE, dig.lab = 3)) |>
+  ggplot() +
+  geom_sf(aes(fill = class), colour = "white", linewidth = 0.1) +
+  scale_fill_brewer(palette = "YlGnBu", name = "Crimes per\n1,000 residents") +
+  theme_void()
+```
+
+
+
+## Graduated symbols
+
+Some cartographers argue that **counts** should not be shown with shading at all, because a big area shaded dark looks like a lot even when it isn't. The alternative is **graduated symbols**: a circle in each area, sized by the count. `st_point_on_surface()` gives a point inside each LSOA to put the circle on:
+
+```{r}
+lsoa_points <- study_lsoa
+st_geometry(lsoa_points) <- st_point_on_surface(st_geometry(study_lsoa))   # swap each polygon for a point, keep the data
+
+ggplot() +
+  geom_sf(data = study_lsoa, fill = "grey95", colour = "white") +
+  geom_sf(data = lsoa_points, aes(size = crimes), colour = "#d7301f", alpha = 0.6) +
+  scale_size_area(max_size = 12, name = "Crimes") +
+  theme_void()
+```
+
+## Small multiples
+
+To compare several things, draw the same map several times, side by side, with the same scale. These are called **small multiples**. Here are the four most common crime types:
+
+```{r}
+#| fig-width: 9
+#| fig-height: 7
+top4 <- study_crimes |> st_drop_geometry() |> count(category, sort = TRUE) |> head(4) |> pull(category)
+
+by_type <- bind_rows(lapply(top4, function(ct) {
+  study_lsoa |> mutate(category = ct,
+                       crimes_type = lengths(st_intersects(study_lsoa, filter(study_crimes, category == ct))))
+}))
+
+ggplot(by_type) +
+  geom_sf(aes(fill = crimes_type), colour = "white", linewidth = 0.1) +
+  facet_wrap(~ category) +
+  scale_fill_distiller(palette = "Purples", direction = 1, name = "Crimes") +
+  theme_void()
+```
+
+Do the crime types concentrate in the same places?
+
+## Binning: when the areas don't suit you
+
+LSOAs are different sizes and shapes, and a large area grabs the eye whatever its value. When no existing geography suits your question, you can lay a regular grid over the study area and count the points in each cell. Hexagons are a popular choice: they tile the plane with no gaps, they look less blocky than squares, and every neighbour is the same distance away.
+
+```{r}
+hexes <- st_make_grid(study_area, cellsize = 250, square = FALSE) |>   # 250 m hexagons
+  st_sf() |>
+  st_filter(study_area)
+
+hexes$crimes <- lengths(st_intersects(hexes, study_crimes))
+
+ggplot() +
+  geom_sf(data = hexes, aes(fill = crimes), colour = NA) +
+  geom_sf(data = study_wards, fill = NA, colour = "grey30") +
+  scale_fill_viridis_c(option = "magma", direction = -1, trans = "sqrt") +
+  theme_void()
+```
+
+### Your turn: change the cell size
+
+Try cells of 100 m, 150 m, 500 m and 1,000 m. At what size do the patterns become noise? At what size do they disappear?
+
+```{r}
+#| include: false
+library(sf); library(dplyr); library(ggplot2)
+```
+
+```{r}
+my_hexes <- st_make_grid(study_area, cellsize = 150, square = FALSE) |>
+  st_sf() |>
+  st_filter(study_area)
+my_hexes$crimes <- lengths(st_intersects(my_hexes, study_crimes))
+
+ggplot(my_hexes) +
+  geom_sf(aes(fill = crimes), colour = NA) +
+  scale_fill_viridis_c(option = "magma", direction = -1, trans = "sqrt") +
+  theme_void()
+```
+
+
+
+## Your turn: a map to be proud of
+
+Put it all together. Choose one crime type, decide between a count and a rate, choose a classification and a palette, and add every map element: title, subtitle, legend title, scale bar, north arrow and sources. Then swap with a neighbour and ask them what your map says. Is that what you meant?
+
+```{r}
+my_type <- "shoplifting"
+
+my_lsoa <- study_lsoa |>
+  mutate(n = lengths(st_intersects(study_lsoa, filter(study_crimes, category == my_type))))
+
+ggplot() +
+  geom_sf(data = my_lsoa, aes(fill = n), colour = "white", linewidth = 0.1) +
+  geom_sf(data = streets, colour = "grey80", linewidth = 0.1) +
+  scale_fill_distiller(palette = "Purples", direction = 1, name = "Crimes") +
+  annotation_scale(location = "bl") +
+  labs(title = "Your title here",
+       subtitle = "What, where, when",
+       caption = "Sources: ...") +
+  theme_void()
+```
+
+::: {.callout-tip collapse="true"}
+## Already know R? Stretch yourself
+1. Save your map at print resolution with `ggsave("my_map.png", width = 18, height = 15, units = "cm", dpi = 300)` (in RStudio).
+2. In RStudio, the `tmap` package used in the module makes thematic maps with less code, and switches to an interactive web map with `tmap_mode("view")`.
+3. Make a **cartogram** (`cartogram::cartogram_cont()`), which resizes each LSOA by its population, so big empty areas stop dominating the map.
+4. Compare `scale_fill_fermenter()`, which bins a continuous variable into classed colours directly in `ggplot2`.
+:::
+
+
+# Part 3: Spatial autocorrelation
+
+*Neighbours, spatial weights, and whether near places are alike*
+
+::: {.main-message}
+"everything is related to everything else, but near things are more related than distant things" (Tobler, 1970). 
+:::
+
+**Spatial autocorrelation** is the measure of this quote above: the correlation among values that comes from their relative location.
+
+- **Positive** spatial autocorrelation: neighbouring areas have similar values (high next to high, low next to low). This is what we usually find with crime.
+- **Negative** spatial autocorrelation: neighbours tend to be dissimilar, like a chessboard. Rare in social data.
+- **None**: values are spread across the map at random.
+
+This matters for two reasons. Substantively, it tells us something about crime: that it clusters, spills over, or shares causes with nearby places. Statistically, it breaks an assumption most of our methods make: that observations are independent. We come back to that at the end.
+
+## Getting started
+
+We use burglaries in July and August 2026, counted per LSOA, in our three Leeds wards. This block repeats the steps from Part 1 in one go.
+
+```{r}
+library(sf); library(dplyr); library(ggplot2); library(jsonlite); library(spdep)
+
+ons <- "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/"
+
+# wards in Leeds, and our three-ward study area
+download.file(paste0(ons, "WD_MAY_2026_UK_BGC/FeatureServer/0/query?where=",
+                     URLencode("LAD26NM='Leeds'", reserved = TRUE),
+                     "&outFields=WD26CD,WD26NM&outSR=4326&f=geojson"), "leeds_wards.geojson", quiet = TRUE)
+study_wards <- st_read("leeds_wards.geojson", quiet = TRUE) |>
+  filter(WD26NM %in% c("Little London & Woodhouse", "Hunslet & Riverside", "Headingley & Hyde Park")) |>
+  st_transform(27700)
+study_area <- st_union(study_wards)
+
+# LSOAs whose centre is in the study area
+download.file(paste0(ons, "Lower_layer_Super_Output_Areas_December_2021_Boundaries_EW_BGC_V5/FeatureServer/0/query?where=",
+                     URLencode("LSOA21NM LIKE 'Leeds%'", reserved = TRUE),
+                     "&outFields=LSOA21CD,LSOA21NM&outSR=4326&f=geojson"), "leeds_lsoa.geojson", quiet = TRUE)
+leeds_lsoa <- st_read("leeds_lsoa.geojson", quiet = TRUE) |> st_transform(27700)
+study_lsoa <- leeds_lsoa[lengths(st_intersects(st_point_on_surface(st_geometry(leeds_lsoa)), study_area)) > 0, ]
+
+# burglaries for July and August 2026, in the study area's bounding box
+bb <- st_bbox(st_transform(study_area, 4326))
+poly <- paste0(bb["ymin"], ",", bb["xmin"], ":", bb["ymin"], ",", bb["xmax"], ":",
+               bb["ymax"], ",", bb["xmax"], ":", bb["ymax"], ",", bb["xmin"])
+get_crimes <- function(month, type) {
+  fromJSON(paste0("https://data.police.uk/api/crimes-street/", type, "?poly=", poly, "&date=", month)) |>
+    flatten() |>
+    transmute(category, month, longitude = as.numeric(location.longitude), latitude = as.numeric(location.latitude))
+}
+burglary <- bind_rows(get_crimes("2026-07", "burglary"), get_crimes("2026-08", "burglary")) |>
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) |>
+  st_transform(27700)
+
+# count burglaries per LSOA
+study_lsoa$burglary <- lengths(st_intersects(study_lsoa, burglary))
+summary(study_lsoa$burglary)
+```
+
+::: {.callout-note collapse="true"}
+## police.uk not responding?
+```r
+data_url <- "https://raw.githubusercontent.com/maczokni/crime_mapping_workshop/main/data/"
+burglary <- bind_rows(read.csv(paste0(data_url, "backup/crimes_2026-07.csv")),
+                      read.csv(paste0(data_url, "backup/crimes_2026-08.csv"))) |>
+  filter(category == "burglary") |>
+  st_as_sf(coords = c("location.longitude", "location.latitude"), crs = 4326) |>
+  st_transform(27700)
+study_lsoa$burglary <- lengths(st_intersects(study_lsoa, burglary))
+```
+:::
+
+```{r}
+ggplot(study_lsoa) +
+  geom_sf(aes(fill = burglary), colour = "white", linewidth = 0.2) +
+  scale_fill_distiller(palette = "Reds", direction = 1, name = "Burglaries") +
+  labs(title = "Burglaries per LSOA, July and August 2026") +
+  theme_void()
+```
+
+Do you see any patterns? Are burglaries spread randomly around the map? Or do areas that are close to each other tend to be more alike?
+
+## Can you spot the real map?
+
+Our eyes find patterns everywhere, even in random noise. Here is a test. One of these maps is the real one. In the others, the same burglary counts have been **shuffled at random** between the LSOAs. Can you tell which is real?
+
+```{r}
+#| fig-width: 10
+#| fig-height: 4
+set.seed(7)
+real <- sample(1:4, 1)
+game <- bind_rows(lapply(1:4, function(i) {
+  values <- if (i == real) study_lsoa$burglary else sample(study_lsoa$burglary)   # sample() shuffles
+  study_lsoa |> mutate(map = paste("Map", LETTERS[i]), value = values)
+}))
+
+ggplot(game) +
+  geom_sf(aes(fill = value), colour = "white", linewidth = 0.1) +
+  facet_wrap(~ map, nrow = 1) +
+  scale_fill_distiller(palette = "Reds", direction = 1, name = "Burglaries") +
+  theme_void()
+```
+
+```{r}
+paste("The real map is Map", LETTERS[real])
+```
+
+If it was hard to tell, that is the point. We need a **measure** of how alike neighbours are, and a **test** of whether that is more than chance. Both start with defining who the neighbours are.
+
+## What is a neighbour?
+
+There are several ways of defining a neighbour. The most common rely on the areas' shapes.
+
+### Contiguity
+
+Two areas are neighbours if they are **contiguous**: if they touch. This can mean two things:
+
+- **Rook** contiguity: areas that share a boundary *edge*. Like the rook in chess, which moves in straight lines.
+- **Queen** contiguity: areas that share an edge *or a corner*. Like the queen, which also moves diagonally.
+
+We can also specify the **order** of contiguity. **First order** neighbours touch the area itself. **Second order** neighbours touch the first order neighbours, and so on.
+
+Let's see this on a simple grid of 5 by 5 squares, with our area of interest in the middle. `poly2nb()` from the `spdep` package finds the neighbours of each square:
+
+```{r}
+#| fig-width: 8
+#| fig-height: 4
+grid <- st_make_grid(st_as_sfc(st_bbox(c(xmin = 0, ymin = 0, xmax = 5, ymax = 5))), n = c(5, 5)) |> st_sf()
+centre <- 13   # the middle square of the 25
+
+rook  <- poly2nb(grid, queen = FALSE)
+queen <- poly2nb(grid, queen = TRUE)
+
+label_neighbours <- function(nb, criterion) {
+  grid |> mutate(
+    criterion = criterion,
+    contiguity = case_when(row_number() == centre ~ "Area itself",
+                           row_number() %in% nb[[centre]] ~ "First order",
+                           row_number() %in% nblag(nb, 2)[[2]][[centre]] ~ "Second order",
+                           TRUE ~ "Not a neighbour"))
+}
+
+bind_rows(label_neighbours(rook, "Rook"), label_neighbours(queen, "Queen")) |>
+  ggplot() +
+  geom_sf(aes(fill = contiguity), colour = "black") +
+  facet_wrap(~ criterion) +
+  scale_fill_manual(values = c("Area itself" = "#b2df8a", "First order" = "#1f78b4",
+                               "Second order" = "#a6cee3", "Not a neighbour" = "white"), name = NULL) +
+  theme_void()
+```
+
+`nb[[centre]]` lists the first order neighbours of the middle square, and `nblag()` finds higher orders. With rook contiguity the middle square has 4 first order neighbours. With queen it has 8.
+
+### Distance
+
+We can also define neighbours by **distance**: for example, all areas whose centres are within 500 metres, or the 5 nearest areas. This doesn't need shared boundaries, so it also works for points. There are other approaches too, based on travel time or flows of people between areas. Contiguity and distance are the most commonly used.
+
+## Neighbours for our LSOAs
+
+Real LSOAs are not squares, but `poly2nb()` works the same way. By default it uses queen contiguity:
+
+```{r}
+nb_queen <- poly2nb(study_lsoa, queen = TRUE)
+nb_queen
+```
+
+Read the summary. It tells us the number of areas (regions), the total number of links between neighbours, and the average number of neighbours per LSOA. A **link** is one area counting another as a neighbour. Here is the distribution of the number of neighbours:
+
+```{r}
+table(card(nb_queen))   # card() counts the neighbours of each area
+```
+
+Now the same with rook contiguity:
+
+```{r}
+nb_rook <- poly2nb(study_lsoa, queen = FALSE)
+nb_rook
+```
+
+There are slightly fewer links: a few LSOAs only touch at a corner. With irregular shapes like these, queen and rook usually give very similar results. On a grid they differ a lot.
+
+### Drawing the neighbours
+
+We can draw the links: a line between the centres of every pair of neighbours. This is a good way to check that the neighbours make sense:
+
+```{r}
+lsoa_centres <- st_point_on_surface(st_geometry(study_lsoa))
+links <- nb2lines(nb_queen, coords = lsoa_centres, as_sf = TRUE)
+
+ggplot() +
+  geom_sf(data = study_lsoa, fill = "grey95", colour = "grey60") +
+  geom_sf(data = links, colour = "#d7301f", linewidth = 0.5) +
+  geom_sf(data = lsoa_centres, size = 1) +
+  labs(title = "Queen neighbours: each line links two LSOAs that touch") +
+  theme_void()
+```
+
+Notice the LSOAs at the edge of the study area. They have fewer neighbours, because their neighbours outside our three wards are not in our data. This is the **edge effect**, and it is one reason not to cut a study area too tightly.
+
+### One LSOA and its neighbours
+
+Let's look at the neighbours of one LSOA: the one containing Leeds Town Hall.
+
+```{r}
+town_hall <- st_sfc(st_point(c(-1.5492, 53.7999)), crs = 4326) |> st_transform(27700)
+focus <- which(lengths(st_intersects(study_lsoa, town_hall)) > 0)
+
+study_lsoa$LSOA21NM[focus]                  # the LSOA itself
+study_lsoa$LSOA21NM[nb_queen[[focus]]]      # its queen neighbours
+
+ggplot() +
+  geom_sf(data = study_lsoa, fill = "white", colour = "grey60") +
+  geom_sf(data = study_lsoa[nb_queen[[focus]], ], fill = "#1f78b4", colour = "grey60") +
+  geom_sf(data = study_lsoa[focus, ], fill = "#b2df8a", colour = "grey60") +
+  theme_void()
+```
+
+## The spatial weights matrix
+
+We now turn our list of neighbours into a **spatial weights matrix**, often written $W$. It is a table with one row and one column for each area: $n$ by $n$, here 43 by 43. Each cell says how much area $j$ (the column) counts as a neighbour of area $i$ (the row).
+
+### Binary weights
+
+The simplest version has a 1 where two areas are neighbours, and a 0 where they are not. `nb2mat()` with `style = "B"` (for binary) builds it. A 43 by 43 table is a lot to look at, so let's view the first 8 rows and columns:
+
+```{r}
+w_binary <- nb2mat(nb_queen, style = "B")
+w_binary[1:8, 1:8]
+```
+
+The row and column names are the LSOAs' row numbers in the original Leeds file. We only see 8 of the 43 columns, so some rows look emptier than they are: their neighbours are further along.
+
+- The **diagonal** is all zeroes: an area is not its own neighbour.
+- The matrix is **symmetrical**: if LSOA 1 is a neighbour of LSOA 2, LSOA 2 is a neighbour of LSOA 1, with the same weight.
+- Each row adds up to the number of neighbours:
+
+```{r}
+head(rowSums(w_binary))
+```
+
+### Row-standardised weights
+
+In most analyses the matrix is **row-standardised**: each row is divided by its number of neighbours, so the weights in every row add up to 1. An LSOA with 4 neighbours gives each of them a weight of 1/4 = 0.25. One with 5 neighbours gives each 0.2. Use `style = "W"`:
+
+```{r}
+w_row <- nb2mat(nb_queen, style = "W")
+round(w_row[1:8, 1:8], 2)
+head(rowSums(w_row))
+```
+
+Why do this? Multiplying our values by a row-standardised matrix gives the **average of the neighbours' values**. That is easy to interpret, and it makes results comparable between areas with many neighbours and areas with few.
+
+Notice that the row-standardised matrix is **not symmetrical**. The influence of LSOA *j* on LSOA *i* depends on how many other neighbours *i* has.
+
+## The spatial lag
+
+The average value of an area's neighbours is called the **spatial lag**. `spdep` works with weights as a list rather than a big matrix (it's more efficient), so we convert with `nb2listw()`, then compute the lag:
+
+```{r}
+weights <- nb2listw(nb_queen, style = "W")
+study_lsoa$burglary_lag <- lag.listw(weights, study_lsoa$burglary)
+
+head(st_drop_geometry(study_lsoa[, c("LSOA21NM", "burglary", "burglary_lag")]))
+```
+
+For each LSOA, `burglary` is its own count, and `burglary_lag` is the average count in its neighbours. Mapped side by side, the lag looks like a smoothed version of the original:
+
+```{r}
+#| fig-width: 9
+#| fig-height: 4.5
+bind_rows(
+  study_lsoa |> mutate(measure = "Burglaries in the LSOA", value = burglary),
+  study_lsoa |> mutate(measure = "Average in its neighbours (spatial lag)", value = burglary_lag)) |>
+  ggplot() +
+  geom_sf(aes(fill = value), colour = "white", linewidth = 0.1) +
+  facet_wrap(~ measure) +
+  scale_fill_distiller(palette = "Reds", direction = 1, name = "Burglaries") +
+  theme_void()
+```
+
+## Measuring spatial autocorrelation: Moran's I
+
+If near things are alike, an area's value should be correlated with its spatial lag. The **Moran scatterplot** shows exactly this: each LSOA's value against the average of its neighbours.
+
+```{r}
+ggplot(st_drop_geometry(study_lsoa), aes(burglary, burglary_lag)) +
+  geom_point(alpha = 0.7) +
+  geom_smooth(method = "lm", se = FALSE, colour = "#d7301f") +
+  geom_vline(xintercept = mean(study_lsoa$burglary), linetype = "dashed", colour = "grey50") +
+  geom_hline(yintercept = mean(study_lsoa$burglary_lag), linetype = "dashed", colour = "grey50") +
+  labs(x = "Burglaries in the LSOA", y = "Average burglaries in its neighbours") +
+  theme_minimal()
+```
+
+An upward slope means positive spatial autocorrelation. The dashed lines at the means split the plot into four quadrants: high values surrounded by high (top right), low by low (bottom left), and the two kinds of outlier.
+
+The most widely used measure of spatial autocorrelation is **Moran's I**. With row-standardised weights it is essentially the slope of that line. It usually lies between -1 and 1: positive values mean neighbours are alike, values near 0 mean no spatial pattern.
+
+### Is it more than chance?
+
+To test it, we do what we did by eye earlier: shuffle the values randomly between the LSOAs many times, compute Moran's I for each shuffle, and see where our real value falls. This is a **permutation test** (also called a Monte Carlo test). With 999 shuffles:
+
+```{r}
+set.seed(2026)
+moran_test <- moran.mc(study_lsoa$burglary, weights, nsim = 999)
+moran_test
+```
+
+`statistic` is Moran's I for the real data. The p-value is the share of shuffled maps with a Moran's I at least as high as ours. A small p-value means a pattern this strong would rarely appear by chance: we reject the null hypothesis of spatial randomness.
+
+```{r}
+ggplot(data.frame(I = moran_test$res[1:999]), aes(I)) +
+  geom_histogram(bins = 40, fill = "grey70") +
+  geom_vline(xintercept = moran_test$statistic, colour = "#d7301f", linewidth = 1) +
+  labs(x = "Moran's I in 999 shuffled maps (red line: the real map)", y = NULL) +
+  theme_minimal()
+```
+
+::: {.callout-important}
+## Think
+Moran's I is a **global** measure. It tells us how much the map as a whole is clustered, not *where* the clusters are. You can have local pockets of clustering without global autocorrelation, and the reverse. Where would you go to find the clusters?
+:::
+
+### Your turn: does the definition of neighbour matter?
+
+Rerun the test with rook neighbours instead of queen. Does Moran's I change? Then try binary weights (`style = "B"`) instead of row-standardised.
+
+```{r}
+#| include: false
+library(sf); library(dplyr); library(spdep)
+```
+
+```{r}
+my_nb <- poly2nb(study_lsoa, queen = FALSE)
+my_weights <- nb2listw(my_nb, style = "W")
+
+set.seed(2026)
+moran.mc(study_lsoa$burglary, my_weights, nsim = 999)
+```
+
+
+
+### Your turn: another crime type
+
+Is every crime type equally autocorrelated? Get a different crime type from the API, count it per LSOA, and test it.
+
+```{r}
+#| include: false
+library(sf); library(dplyr); library(jsonlite); library(spdep)
+```
+
+```{r}
+my_crimes <- get_crimes("2026-08", "anti-social-behaviour") |>
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) |>
+  st_transform(27700)
+
+my_counts <- lengths(st_intersects(study_lsoa, my_crimes))
+
+set.seed(2026)
+moran.mc(my_counts, weights, nsim = 999)
+```
+
+
+
+## Spatial autocorrelation and regression
+
+We won't fit models today, but this is where spatial autocorrelation matters most for research.
+
+- Ordinary regression assumes the observations are **independent**. Neighbouring areas usually are not: they share causes, and crime spills over from one to the next.
+- If we ignore this, our standard errors are too small, and we find "significant" effects that are not really there.
+- The check: fit the model, then look at the **residuals** (the differences between observed and predicted values). Map them, and test them for spatial autocorrelation with Moran's I, using the same spatial weights we built here. Residuals should look random on the map.
+- If they are spatially autocorrelated, **spatial regression** models build the weights matrix into the model: the **spatial lag model** includes the neighbours' values of the outcome, and the **spatial error model** allows the errors of neighbours to be correlated.
+
+Everything in those models rests on the decisions we made today: who counts as a neighbour, and how much they count. See the module's final week for how to fit them.
+
+::: {.callout-tip collapse="true"}
+## Already know R? Stretch yourself
+1. **Local Moran's I** (LISA; Anselin, 1995) finds *where* the clusters are: `localmoran_perm(study_lsoa$burglary, weights, nsim = 999)`. Map the high-high and low-low clusters. Adjust the p-values for multiple testing with `p.adjust()`.
+2. Try **distance-based** neighbours: `dnearneigh(lsoa_centres, 0, 600)` (all LSOAs within 600 m) or `knn2nb(knearneigh(lsoa_centres, k = 5))` (the 5 nearest). How does Moran's I change?
+3. Use **rates** rather than counts (Part 2 shows how to get population from nomis). Does the conclusion change?
+4. Fit a regression of burglary on population with `lm()`, then test its residuals with `lm.morantest()`.
+:::
