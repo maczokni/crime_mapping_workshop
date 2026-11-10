@@ -218,6 +218,15 @@ download.file(ward_url, "leeds_wards.geojson")
 leeds_wards <- st_read("leeds_wards.geojson")
 ```
 
+::: {.callout-note collapse="true"}
+## Ward download not working?
+If you get an error like `Cannot open "leeds_wards.geojson"`, the ONS service has changed. Use our saved copy instead: replace `download.file(ward_url, ...)` with this line, then run the block again.
+
+```r
+download.file("https://raw.githubusercontent.com/maczokni/crime_mapping_workshop/refs/heads/main/leeds_wards.geojson", "leeds_wards.geojson")
+```
+:::
+
 `download.file()` saves the result as a file, and `st_read()` reads any spatial file format (shapefile, GeoJSON, GeoPackage and more) into R. Let's look:
 
 ```{webr}
@@ -597,7 +606,7 @@ my_url <- paste0("https://data.police.uk/api/crimes-street/", "burglary",
 :::
 
 ## Already know R? Stretch yourself
-1. Census **Output Areas** are smaller still (about 300 residents). Request them from the portal (`Output_Areas_2021_EW_BGC_V2`, field `OA21CD`; look up the service name in the [portal's API list](https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services)) and map crimes per OA.
+1. Census **Output Areas** are smaller still (about 300 residents). Request them from the portal: the service is `OA_2021_EW_BGC_V2_RUC`, field `OA21CD`. The portal returns at most 2,000 areas per request, and Leeds has over 2,600, so ask only for those in the study area's bounding box: add `&geometry=-1.5905,53.7555,-1.4820,53.8242&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects` to the query instead of a `where` filter (use `where=1%3D1`). Then map crimes per OA. If the portal doesn't respond, use our saved copy: `download.file("https://raw.githubusercontent.com/maczokni/crime_mapping_workshop/refs/heads/main/leeds_oa.geojson", "leeds_oa.geojson")`.
 2. Explore the `sfnetworks` package [https://luukvdmeer.github.io/sfnetworks/](https://luukvdmeer.github.io/sfnetworks/). You can try using it to split the streets at junctions (`to_spatial_subdivision`) before counting crimes per segment above. 
 3. The police.uk API also has stop and search data: `https://data.police.uk/api/stops-street?poly=...&date=2026-08`. Map it alongside crime or look at area-level correlations.
 :::

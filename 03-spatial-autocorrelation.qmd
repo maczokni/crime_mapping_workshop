@@ -74,10 +74,11 @@ summary(study_lsoa$burglary)
 ```
 
 ::: {.callout-note collapse="true"}
-## LSOA download not working?
-If you get an error like `Cannot open "leeds_lsoa.geojson"`, the ONS service has changed. Use our saved copy instead: replace the LSOA `download.file(...)` with this line, then run the block again.
+## Ward or LSOA download not working?
+If you get an error like `Cannot open "leeds_wards.geojson"` or `Cannot open "leeds_lsoa.geojson"`, the ONS service has changed. Use our saved copies instead: replace the ward or LSOA `download.file(...)` with the matching line below, then run the block again.
 
 ```r
+download.file("https://raw.githubusercontent.com/maczokni/crime_mapping_workshop/refs/heads/main/leeds_wards.geojson", "leeds_wards.geojson")
 download.file("https://raw.githubusercontent.com/maczokni/crime_mapping_workshop/refs/heads/main/leeds_lsoa.geojson", "leeds_lsoa.geojson")
 ```
 :::
