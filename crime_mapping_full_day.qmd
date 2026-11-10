@@ -375,7 +375,7 @@ ggplot() +
 
 ```{r}
 lsoa_url <- paste0(ons,
-  "Lower_layer_Super_Output_Areas_December_2021_Boundaries_EW_BGC_V5/FeatureServer/0/query",
+  "LSOA_2021_EW_BSC_V4_RUC/FeatureServer/0/query",
   "?where=", URLencode("LSOA21NM LIKE 'Leeds%'", reserved = TRUE),
   "&outFields=LSOA21CD,LSOA21NM&outSR=4326&f=geojson")
 
@@ -661,7 +661,7 @@ The API can return a single crime type by replacing `all-crime` with its categor
 #| include: false
 library(sf); library(dplyr); library(ggplot2); library(jsonlite)
 ons <- "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/"
-lsoa_url <- paste0(ons, "Lower_layer_Super_Output_Areas_December_2021_Boundaries_EW_BGC_V5/FeatureServer/0/query",
+lsoa_url <- paste0(ons, "LSOA_2021_EW_BSC_V4_RUC/FeatureServer/0/query",
   "?where=", URLencode("LSOA21NM LIKE 'Leeds%'", reserved = TRUE), "&outFields=LSOA21CD,LSOA21NM&outSR=4326&f=geojson")
 download.file(lsoa_url, "leeds_lsoa_ex.geojson", quiet = TRUE)
 leeds_lsoa <- st_read("leeds_lsoa_ex.geojson", quiet = TRUE)
@@ -729,7 +729,7 @@ study_wards <- st_read("leeds_wards.geojson", quiet = TRUE) |>
 study_area <- st_union(study_wards)
 
 # LSOAs whose centre is in the study area
-download.file(paste0(ons, "Lower_layer_Super_Output_Areas_December_2021_Boundaries_EW_BGC_V5/FeatureServer/0/query?where=",
+download.file(paste0(ons, "LSOA_2021_EW_BSC_V4_RUC/FeatureServer/0/query?where=",
                      URLencode("LSOA21NM LIKE 'Leeds%'", reserved = TRUE),
                      "&outFields=LSOA21CD,LSOA21NM&outSR=4326&f=geojson"), "leeds_lsoa.geojson", quiet = TRUE)
 leeds_lsoa <- st_read("leeds_lsoa.geojson", quiet = TRUE)
@@ -1176,7 +1176,7 @@ study_wards <- st_read("leeds_wards.geojson", quiet = TRUE) |>
 study_area <- st_union(study_wards)
 
 # LSOAs whose centre is in the study area
-download.file(paste0(ons, "Lower_layer_Super_Output_Areas_December_2021_Boundaries_EW_BGC_V5/FeatureServer/0/query?where=",
+download.file(paste0(ons, "LSOA_2021_EW_BSC_V4_RUC/FeatureServer/0/query?where=",
                      URLencode("LSOA21NM LIKE 'Leeds%'", reserved = TRUE),
                      "&outFields=LSOA21CD,LSOA21NM&outSR=4326&f=geojson"), "leeds_lsoa.geojson", quiet = TRUE)
 leeds_lsoa <- st_read("leeds_lsoa.geojson", quiet = TRUE) |> st_transform(27700)

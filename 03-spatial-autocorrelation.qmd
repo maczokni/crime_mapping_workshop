@@ -49,7 +49,7 @@ study_wards <- st_read("leeds_wards.geojson", quiet = TRUE) |>
 study_area <- st_union(study_wards)
 
 # LSOAs whose centre is in the study area
-download.file(paste0(ons, "Lower_layer_Super_Output_Areas_December_2021_Boundaries_EW_BGC_V5/FeatureServer/0/query?where=",
+download.file(paste0(ons, "LSOA_2021_EW_BSC_V4_RUC/FeatureServer/0/query?where=",
                      URLencode("LSOA21NM LIKE 'Leeds%'", reserved = TRUE),
                      "&outFields=LSOA21CD,LSOA21NM&outSR=4326&f=geojson"), "leeds_lsoa.geojson", quiet = TRUE)
 leeds_lsoa <- st_read("leeds_lsoa.geojson", quiet = TRUE) |> st_transform(27700)
@@ -72,6 +72,15 @@ burglary <- bind_rows(get_crimes("2026-07", "burglary"), get_crimes("2026-08", "
 study_lsoa$burglary <- lengths(st_intersects(study_lsoa, burglary))
 summary(study_lsoa$burglary)
 ```
+
+::: {.callout-note collapse="true"}
+## LSOA download not working?
+If you get an error like `Cannot open "leeds_lsoa.geojson"`, the ONS service has changed. Use our saved copy instead: replace the LSOA `download.file(...)` with this line, then run the block again.
+
+```r
+download.file("https://raw.githubusercontent.com/maczokni/crime_mapping_workshop/refs/heads/main/leeds_lsoa.geojson", "leeds_lsoa.geojson")
+```
+:::
 
 ::: {.callout-note collapse="true"}
 ## police.uk not responding?

@@ -257,7 +257,7 @@ ggplot() +
 
 ```{webr}
 lsoa_url <- paste0(ons,
-  "Lower_layer_Super_Output_Areas_December_2021_Boundaries_EW_BGC_V5/FeatureServer/0/query",
+  "LSOA_2021_EW_BSC_V4_RUC/FeatureServer/0/query",
   "?where=", URLencode("LSOA21NM LIKE 'Leeds%'", reserved = TRUE),
   "&outFields=LSOA21CD,LSOA21NM&outSR=4326&f=geojson")
 
@@ -265,6 +265,15 @@ download.file(lsoa_url, "leeds_lsoa.geojson")
 leeds_lsoa <- st_read("leeds_lsoa.geojson", quiet = TRUE)
 nrow(leeds_lsoa)
 ```
+
+::: {.callout-note collapse="true"}
+## LSOA download not working?
+If you get an error like `Cannot open "leeds_lsoa.geojson"`, the ONS service has changed. Use our saved copy instead: replace the LSOA `download.file(...)` with this line, then run the block again.
+
+```r
+download.file("https://raw.githubusercontent.com/maczokni/crime_mapping_workshop/refs/heads/main/leeds_lsoa.geojson", "leeds_lsoa.geojson")
+```
+:::
 
 We keep only the LSOAs in our study area. But LSOAs do **not** nest inside wards: the two were drawn separately, so some ward boundaries cut straight through LSOAs. Whatever we do, the edge will be ragged. We ask: whose *centre* falls inside our study area? `st_point_on_surface()` gives a point guaranteed to lie inside each polygon, and `st_intersects()` tells us which of those points are in the study area. This keeps the LSOAs that are mostly inside. Using the whole shape instead would pick up every LSOA that merely touches the edge: 78 instead of 43, covering more than twice the area of our three wards.
 
@@ -544,7 +553,7 @@ The API can return a single crime type by replacing `all-crime` with its categor
 #| exercise: ex_burglary
 library(sf); library(dplyr); library(ggplot2); library(jsonlite)
 ons <- "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/"
-lsoa_url <- paste0(ons, "Lower_layer_Super_Output_Areas_December_2021_Boundaries_EW_BGC_V5/FeatureServer/0/query",
+lsoa_url <- paste0(ons, "LSOA_2021_EW_BSC_V4_RUC/FeatureServer/0/query",
   "?where=", URLencode("LSOA21NM LIKE 'Leeds%'", reserved = TRUE), "&outFields=LSOA21CD,LSOA21NM&outSR=4326&f=geojson")
 download.file(lsoa_url, "leeds_lsoa_ex.geojson", quiet = TRUE)
 leeds_lsoa <- st_read("leeds_lsoa_ex.geojson", quiet = TRUE)

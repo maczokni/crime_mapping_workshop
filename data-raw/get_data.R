@@ -38,7 +38,7 @@ ward_url <- paste0(ons, "WD_MAY_2026_UK_BGC/FeatureServer/0/query?",
 download.file(ward_url, tf <- tempfile(fileext = ".geojson"), quiet = TRUE)
 leeds_wards <- st_read(tf, quiet = TRUE)
 
-lsoa_url <- paste0(ons, "Lower_layer_Super_Output_Areas_December_2021_Boundaries_EW_BGC_V5/FeatureServer/0/query?",
+lsoa_url <- paste0(ons, "LSOA_2021_EW_BSC_V4_RUC/FeatureServer/0/query?",
                    "where=LSOA21NM%20LIKE%20%27Leeds%25%27&outFields=LSOA21CD,LSOA21NM&outSR=4326&f=geojson")
 download.file(lsoa_url, tf <- tempfile(fileext = ".geojson"), quiet = TRUE)
 leeds_lsoa <- st_read(tf, quiet = TRUE)
